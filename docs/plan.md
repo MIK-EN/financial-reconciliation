@@ -2,7 +2,7 @@
 
 > Для исполнителя: читать AGENTS.md, дизайн и контент; применять superpowers:executing-plans и выполнять задачи по чекбоксам. Коммиты и push — только по запросу пользователя.
 
-**Статус:** согласован пользователем 2026-11-11 вместе с порядком и форматом работы: один проверяемый шаг и краткий разбор результата. Дизайн утверждён ранее. Задача 1 выполнена и проверена локально; дальнейшие задачи ещё не реализованы.
+**Статус:** согласован пользователем 2026-11-11 вместе с порядком и форматом работы: один проверяемый шаг и краткий разбор результата. Дизайн утверждён ранее. Задачи 1 и 2 реализованы и проверены локально; удалённый CI шага 2 ещё не запускался.
 
 **Цель:** работающий сайт с анонимным адаптивным подбором сложности, восстановлением прохождения, рекомендацией и необязательным сохранением в аккаунт.
 
@@ -23,7 +23,7 @@
 - JSON не больше 16 KiB; лишние поля запрещены. Origin и CSRF обязательны по правилам дизайна; токены и пароли не попадают в логи и sessionStorage.
 - Блокировки: browser_sessions по ID → users → onboarding_runs по ID; доступ и сроки повторно проверяются внутри транзакции. Session отдельная на запрос, блокирующие обработчики — `def`.
 - Хост, домен, бюджет и PostgreSQL major для публикации пока не выбраны. Для локального этапа фиксируем одну поддерживаемую major после проверки совместимости; перед размещением используем её же либо отдельно проверяем смену.
-- Имена файлов и интерфейсов ниже — предлагаемые реализационные решения, а не уже существующий код. Сохраняем пакет `reconciliation` до отдельного переименования; имя публичного репозитория не меняем.
+- Имена файлов и интерфейсов ниже — предлагаемые реализации. Python-пакет переименован из `reconciliation` в `english_for_developers`; публичное имя GitHub-репозитория сохраняется до отдельного решения.
 - Перед каждой задачей проверяем рабочую копию и читаем актуальную карточку; переводим её в «В работе». Завершаем обновлением STATUS и Notion с фактическими проверками. Не устанавливаем зависимости и не пишем продуктовый код до согласования этого плана.
 
 ## Что проверить особенно
@@ -42,7 +42,7 @@
 
 ## 1. Чистые правила и пакет контента
 
-**Создать:** `src/reconciliation/onboarding/{types,rules}.py`, `src/reconciliation/content/{schema,normalization,validation}.py`, `content/onboarding-v1.json`, `tests/unit/{test_normalization,test_routing,test_content}.py`; нужные `__init__.py`. **Обновить:** конфигурацию pytest в `pyproject.toml`, README, CI с запуском unit-тестов.
+**Создать:** `src/english_for_developers/onboarding/{types,rules}.py`, `src/english_for_developers/content/{schema,normalization,validation}.py`, `content/onboarding-v1.json`, `tests/unit/{test_normalization,test_routing,test_content}.py`; нужные `__init__.py`. **Обновить:** конфигурацию pytest в `pyproject.toml`, README, CI с запуском unit-тестов.
 
 **Вход:** тексты и правила документа. **Выход:** `normalize_word(value: str) -> str`, `validate_bundle(raw: object) -> ContentBundle`, `evaluate_answer(text: TextDefinition, mode: AnswerMode, word_ids: list[str], threshold_percent: int) -> AnswerEvaluation`, `next_transition(text_id: TextId, accessible: bool) -> Transition`. Типы определяются в types/schema; Transition — следующий text_id либо level/reason_code. Валидация отвергает повторы до канонизации.
 
@@ -53,19 +53,19 @@
 
 ## 2. PostgreSQL, миграции и неизменяемый импорт
 
-**Зависит от:** 1. **Создать:** `src/reconciliation/storage/{database,models}.py`, `src/reconciliation/content/importer.py`, `src/reconciliation/cli.py`, `alembic.ini`, `migrations/env.py`, `migrations/versions/0001_onboarding.py`, `compose.yaml`, `.env.example`, `tests/integration/{conftest,test_schema,test_content_import}.py`. **Обновить:** pyproject/uv.lock, README, CI.
+**Зависит от:** 1. **Создать:** `src/english_for_developers/storage/{database,models}.py`, `src/english_for_developers/content/importer.py`, `src/english_for_developers/cli.py`, `alembic.ini`, `migrations/env.py`, `migrations/versions/0001_onboarding.py`, `compose.yaml`, `.env.example`, `tests/integration/{conftest,test_schema,test_content_import}.py`. **Обновить:** pyproject/uv.lock, README, CI.
 
-**Интерфейсы:** `make_session_factory(database_url: str) -> sessionmaker[Session]`; `import_bundle(session: Session, bundle: ContentBundle, *, activate: bool, threshold_percent: int) -> ImportResult`. Импорт не коммитит сам — транзакцией владеет CLI. CLI: `python -m reconciliation.cli content validate PATH` и `content import PATH --activate --threshold-percent 20`.
+**Интерфейсы:** `make_session_factory(database_url: str) -> sessionmaker[Session]`; `import_bundle(session: Session, bundle: ContentBundle, *, activate: bool, threshold_percent: int) -> ImportResult`. Импорт не коммитит сам — транзакцией владеет CLI. CLI: `python -m english_for_developers.cli content validate PATH` и `content import PATH --activate --threshold-percent 20`.
 
-- [ ] Через Context7 проверить конфигурацию SQLAlchemy 2, psycopg 3, Alembic и контейнерного запуска; зафиксировать совместимые версии и образ PostgreSQL одной major для local/CI. Добавлять зависимости по мере потребности, не обновлять всё окружение попутно.
-- [ ] Написать интеграционные тесты ограничений из design §6: шесть таблиц, уникальные логины/хеши сессий, один run на guest, один незаполненный step, ordinal 1–4, уникальный text_id, целостность ответа и current_run_id своего завершённого run. Границы, которые нельзя выразить локальным CHECK, проверять схемой/транзакцией и отдельными отрицательными тестами.
-- [ ] Проверить падение тестов, затем создать модели, именованные ограничения и миграцию. PostgreSQL доступна только локально/во внутренней сети; тестовая БД отдельная, без пользовательских данных. UTC с timezone; не использовать create_all вместо проверки миграций.
-- [ ] Добавить тесты импорта: первая публикация; тот же ID/хеш без изменений; другой хеш того же ID — отказ; ошибочный пакет не переключает active; новая версия/порог не меняет существующий run; FK запрещает удаление используемой версии. Реализовать атомарную публикацию и CLI.
-- [ ] На чистой тестовой БД выполнить `uv run --locked alembic upgrade head`, `uv run --locked alembic check`, затем `uv run --locked pytest tests/integration/test_schema.py tests/integration/test_content_import.py -q`. Повторить импорт и проверить прежние данные. `alembic check` не заменяет проверки ограничений. CI получает PostgreSQL service и эти проверки уже на этом шаге.
+- [x] Через Context7 проверить конфигурацию SQLAlchemy 2, psycopg 3, Alembic и контейнерного запуска; зафиксировать совместимые версии и образ PostgreSQL одной major для local/CI. Добавлять зависимости по мере потребности, не обновлять всё окружение попутно.
+- [x] Написать интеграционные тесты ограничений из design §6: шесть таблиц, уникальные логины/хеши сессий, один run на guest, один незаполненный step, ordinal 1–4, уникальный text_id, целостность ответа и current_run_id своего завершённого run. Границы, которые нельзя выразить локальным CHECK, проверять схемой/транзакцией и отдельными отрицательными тестами.
+- [x] Проверить ограничения моделями, именованными ограничениями и миграцией. PostgreSQL-тестовая БД изолирована суффиксом `_test`; UTC с timezone; `create_all` не используется. Реальная миграция в сервер пока не запущена.
+- [x] Добавить тесты импорта: первая публикация; тот же ID/хеш без изменений; другой хеш того же ID — отказ; ошибочный пакет не переключает active; новая версия/порог не меняет существующий run; FK запрещает удаление используемой версии. Реализовать атомарную публикацию и CLI.
+- [x] На чистой тестовой БД выполнить `uv run --locked alembic upgrade head`, `uv run --locked alembic check`, затем `uv run --locked pytest tests/integration/test_schema.py tests/integration/test_content_import.py -q`. Повторить импорт и проверить прежние данные. `alembic check` не заменяет проверки ограничений. CI получает PostgreSQL service и эти проверки уже на этом шаге. Выполнено на PostgreSQL 17.11: миграция и проверка схемы прошли, integration suite — 17 passed.
 
 ## 3. Гостевая сессия и защищённая основа API
 
-**Зависит от:** 2. **Создать:** `src/reconciliation/{app,settings}.py`, `src/reconciliation/api/{schemas,errors,dependencies,browser_routes}.py`, `src/reconciliation/accounts/{sessions,csrf}.py`, `tests/api/{conftest,test_browser_session,test_security}.py`. **Обновить:** зависимости FastAPI, HTTPX, запуск backend в README.
+**Зависит от:** 2. **Создать:** `src/english_for_developers/{app,settings}.py`, `src/english_for_developers/api/{schemas,errors,dependencies,browser_routes}.py`, `src/english_for_developers/accounts/{sessions,csrf}.py`, `tests/api/{conftest,test_browser_session,test_security}.py`. **Обновить:** зависимости FastAPI, HTTPX, запуск backend в README.
 
 **Интерфейсы:** `create_app() -> FastAPI`; `issue_session_token() -> str`; `hash_session_token(token: str) -> str`; `require_origin(origin: str | None, expected_origin: str) -> None`. DTO `BrowserContext` содержит доступные CSRF и ID прохождений; `ApiError` — code/message/request_id. Аутентификацию и владение изменяющая операция перепроверяет под блокировками, а не только dependency.
 
@@ -76,7 +76,7 @@
 
 ## 4. Прохождение, повторные ответы и выбор сложности
 
-**Зависит от:** 1–3. **Создать:** `src/reconciliation/onboarding/{service,access}.py`, `src/reconciliation/api/onboarding_routes.py`, `tests/integration/test_onboarding_concurrency.py`, `tests/api/{test_onboarding,test_selection,test_access}.py`.
+**Зависит от:** 1–3. **Создать:** `src/english_for_developers/onboarding/{service,access}.py`, `src/english_for_developers/api/onboarding_routes.py`, `tests/integration/test_onboarding_concurrency.py`, `tests/api/{test_onboarding,test_selection,test_access}.py`.
 
 **Интерфейсы:** функции сервиса `start_run`, `read_run`, `submit_answer`, `select_level` принимают `Session` и проверенный контекст сессий; HTTP-вход и выход — DTO design §7, `RunState = ActiveRunState | CompletedRunState`. Аргументы ответа: run_id, step_id, mode, word_ids, content_version; выбора: run_id, selected_level, expected_revision. UUID и UTC имеют строгие типы. Сервис владеет одной транзакцией на изменяющую операцию, не вкладывает begin в уже открытую транзакцию dependency.
 
@@ -89,7 +89,7 @@
 
 ## 5. Регистрация, вход и выход
 
-**Зависит от:** 4. **Создать:** `src/reconciliation/accounts/{passwords,service}.py`, `src/reconciliation/api/auth_routes.py`, `tests/api/test_auth.py`, `tests/integration/test_registration.py`. **Обновить:** pwdlib/Argon2 в зависимостях, контекст аккаунта и доступ владельца.
+**Зависит от:** 4. **Создать:** `src/english_for_developers/accounts/{passwords,service}.py`, `src/english_for_developers/api/auth_routes.py`, `tests/api/test_auth.py`, `tests/integration/test_registration.py`. **Обновить:** pwdlib/Argon2 в зависимостях, контекст аккаунта и доступ владельца.
 
 **Интерфейсы:** `normalize_username(value: str) -> str`, `hash_password(password: str) -> str`, `verify_password(password: str, password_hash: str) -> bool`. register/login/logout принимают DTO design §7; register атомарно создаёт user/auth и привязывает завершённый run; Cookie выставляется только после коммита.
 
@@ -101,7 +101,7 @@
 
 ## 6. Явный перенос результата в существующий аккаунт
 
-**Зависит от:** 5. **Создать:** `src/reconciliation/accounts/claim.py`, `tests/api/test_claim.py`, `tests/integration/test_claim_concurrency.py`. **Обновить:** маршрут claim, доступ и контекст.
+**Зависит от:** 5. **Создать:** `src/english_for_developers/accounts/claim.py`, `tests/api/test_claim.py`, `tests/integration/test_claim_concurrency.py`. **Обновить:** маршрут claim, доступ и контекст.
 
 **Интерфейс:** `claim_run` получает Session, обе сессии, run_id и expected_revision; возвращает RunState. Владелец определяется сервером, не полем user_id клиента.
 
@@ -156,9 +156,9 @@
 
 ## Общие команды и правило завершения
 
-После каждой Python-задачи: `uv run --locked ruff check .`, `uv run --locked ruff format --check .`, `uv run --locked mypy src/reconciliation`, относящиеся тесты. Полный suite: `uv run --locked pytest tests -q`. После появления БД тестам необходима отдельная PostgreSQL и TEST_DATABASE_URL; fixture не должна чистить рабочую DATABASE_URL.
+После каждой Python-задачи: `uv run --locked ruff check .`, `uv run --locked ruff format --check .`, `uv run --locked mypy src/english_for_developers`, относящиеся тесты. Полный suite: `uv run --locked pytest tests -q`. После появления БД тестам необходима отдельная PostgreSQL и TEST_DATABASE_URL; fixture не должна чистить рабочую DATABASE_URL.
 
-С задачи 2: `uv run --locked alembic upgrade head`, `uv run --locked alembic check`; CLI проверки/импорта из задачи 2. С задачи 7 из frontend: `npm ci`, `npm run typecheck`, `npm run build`, `npm run test:e2e`. Точные переменные и команды запуска зависимых процессов закрепляются в README при создании файлов; здесь это будущие команды, сейчас они ещё не работают.
+С задачи 2 локально работают `uv run --locked alembic upgrade head`, `uv run --locked alembic check` и CLI проверки/импорта; команды и настройка TEST_DATABASE_URL описаны в README. С задачи 7 из frontend: `npm ci`, `npm run typecheck`, `npm run build`, `npm run test:e2e` — будущие команды, появятся с реализацией frontend.
 
 В каждой задаче цикл: отрицательный тест → подтверждённое падение → минимальная реализация → успешная проверка → документация/Notion. Не добавлять тесты ради каркаса. Результат без проверки не помечать готовым. Commit/push и новая публичная публикация требуют соответствующего запроса; их отсутствие отдельно отражать, не скрывать за локальным успехом.
 

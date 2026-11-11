@@ -9,7 +9,7 @@
 - Python 3.13, uv, Ruff, mypy, pytest и GitHub Actions настроены ранее.
 - Первый коммит fe2353d опубликован: https://github.com/MIK-EN/financial-reconciliation.
 - CI основы прошёл: https://github.com/MIK-EN/financial-reconciliation/actions/runs/42785337399.
-- Старые названия репозитория, Python-пакета reconciliation и метаданных ещё не менялись. Переименование будет отдельным согласованным шагом.
+- Старое имя публичного GitHub-репозитория сохранено до отдельного решения; Python-пакет переименован в рамках шага 2.
 - Дизайн и план онбординга утверждены. Шаг 1 реализован; актуальные документы — docs/design.md и docs/plan.md. История первоначальной настройки сохранена в docs/archive/setup/.
 - Реализованы чистые правила и пакет контента; БД, API и веб-интерфейса ещё нет. Утверждённый стек и ограничения записаны в дизайне.
 - Пользователь разрешил порционные коммиты и push. Ветка feat/onboarding-rules опубликована; CI кода на 1bbad06 прошёл успешно (ссылка в последней записи).
@@ -115,3 +115,18 @@
 По прямому запросу пользователя выполнен git push -u origin feat/onboarding-rules. Девять порционных коммитов опубликованы в https://github.com/MIK-EN/financial-reconciliation/tree/feat/onboarding-rules; main не менялся.
 
 CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success: https://github.com/MIK-EN/financial-reconciliation/actions/runs/42982220945. Установка locked-окружения, Ruff, форматирование, mypy и unit-тесты прошли на GitHub. Эта запись и актуализация README входят в отдельный небольшой документационный коммит; приложение не меняется. PR, merge и развёртывание сайта не выполнялись.
+
+## Шаг 2: хранилище и публикация учебного пакета, 2026-11-11
+
+- Python-пакет переименован из `reconciliation` в `english_for_developers`; обновлены импорты, метаданные сборки, mypy, README и план. Историческое имя GitHub-репозитория не менялось. Архив финансового направления остался в `docs/archive/`.
+- Добавлены SQLAlchemy-модели шести таблиц, PostgreSQL 17 Compose, Alembic revision, изолированная тестовая БД с суффиксом `_test`, импортёр неизменяемых версий и CLI validate/import. CI настроен на PostgreSQL service, применение миграции, `alembic check` и integration suite.
+- До запуска Docker Desktop прошли 191 unit-тест, Ruff lint/format и mypy; Compose config и Alembic offline SQL generation также прошли. Первоначальная ошибка Docker daemon устранена после запуска пользователем Docker Desktop; результат реальных PostgreSQL-проверок приведён ниже.
+- Реальный `alembic upgrade head`, `alembic check` и integration suite выполнены на PostgreSQL 17.11; подробности ниже. Шаг 2 завершён локально.
+
+### Повторная проверка после запуска Docker Desktop
+
+- Пользователь запустил Docker Desktop. Сначала доступ к сокету был закрыт sandbox-разрешением; после разрешённого вызова Docker Engine ответил версией 27.5.1. Запущен PostgreSQL 17.11 на `127.0.0.1:5432`, healthcheck — healthy. Локальный том `projecthh_postgres_data` создан для этого проекта; в Compose основной порт доступен только на loopback.
+- При первом старте init-скрипт выявил, что psql не подставляет переменные в SQL, переданный аргументом `--command`. Исправлено чтение SQL из stdin с безопасным quoting идентификаторов; чистый том пересоздан, после этого отдельная БД `english_for_developers_test` создана успешно.
+- Реальная проверка: `alembic upgrade head` применил revision `0001_onboarding`; `alembic check` — `No new upgrade operations detected`; `pytest tests/integration -q` — 17 passed; полный `pytest tests -q` — 208 passed. Ruff lint, Ruff format, mypy, Compose config и `git diff --check` прошли. Новый GitHub Actions run не выполнялся.
+- Исправлены две обнаруженные тестами проблемы: schema test исключает служебную `alembic_version` из шести таблиц приложения; интеграционный CLI-тест явно направляет команду через `TEST_DATABASE_URL`. Disposable `_test` база очищается между тестами, включая внешне зафиксированную транзакцию CLI.
+- Онбординг 2 выполнен локально; следующий шаг по плану — 3, гостевая сессия и API. По просьбе пользователя изменения разбиты и коммитятся порциями в ветку `feat/onboarding-storage`. Созданы локальные коммиты: `1c252d0` (переименование пакета, 186 строк), `759768a` (модели и session factory, 242), `c420a73` (PostgreSQL/Alembic конфигурация, 350), `833c83c` (schema integration tests, 313), `a64e221` (импортёр/CLI и проверки, 480), `9d80cb0` (CLI validation tests, 27). Документация и CI ожидают отдельного небольшого коммита. Push не выполнялся.
