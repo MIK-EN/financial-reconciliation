@@ -16,3 +16,6 @@ build/
 /uploads/
 /reports/
 .superpowers/
+
+# Local history of the cancelled project; not part of this product.
+/docs/archive/financial-reconciliation/
