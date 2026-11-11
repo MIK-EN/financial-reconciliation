@@ -1,0 +1,559 @@
+{
+  "bundle_version": "onboarding-v1",
+  "normalization_version": "surface-v1",
+  "policy_version": "routing-v1",
+  "texts": [
+    {
+      "id": "start",
+      "segments": [
+        {
+          "kind": "text",
+          "value": "You can create a new file, save your work, and open the file again later."
+        }
+      ],
+      "words": [
+        {
+          "id": "w1",
+          "normalized": "you"
+        },
+        {
+          "id": "w2",
+          "normalized": "can"
+        },
+        {
+          "id": "w3",
+          "normalized": "create"
+        },
+        {
+          "id": "w4",
+          "normalized": "a"
+        },
+        {
+          "id": "w5",
+          "normalized": "new"
+        },
+        {
+          "id": "w6",
+          "normalized": "file"
+        },
+        {
+          "id": "w7",
+          "normalized": "save"
+        },
+        {
+          "id": "w8",
+          "normalized": "your"
+        },
+        {
+          "id": "w9",
+          "normalized": "work"
+        },
+        {
+          "id": "w10",
+          "normalized": "and"
+        },
+        {
+          "id": "w11",
+          "normalized": "open"
+        },
+        {
+          "id": "w12",
+          "normalized": "the"
+        },
+        {
+          "id": "w13",
+          "normalized": "again"
+        },
+        {
+          "id": "w14",
+          "normalized": "later"
+        }
+      ]
+    },
+    {
+      "id": "simplified",
+      "segments": [
+        {
+          "kind": "text",
+          "value": "Open the file. Read the text. Save your changes."
+        }
+      ],
+      "words": [
+        {
+          "id": "w1",
+          "normalized": "open"
+        },
+        {
+          "id": "w2",
+          "normalized": "the"
+        },
+        {
+          "id": "w3",
+          "normalized": "file"
+        },
+        {
+          "id": "w4",
+          "normalized": "read"
+        },
+        {
+          "id": "w5",
+          "normalized": "text"
+        },
+        {
+          "id": "w6",
+          "normalized": "save"
+        },
+        {
+          "id": "w7",
+          "normalized": "your"
+        },
+        {
+          "id": "w8",
+          "normalized": "changes"
+        }
+      ]
+    },
+    {
+      "id": "installation",
+      "segments": [
+        {
+          "kind": "text",
+          "value": "Before you install the application, check the system requirements. You may need to update your operating system or free up some disk space."
+        }
+      ],
+      "words": [
+        {
+          "id": "w1",
+          "normalized": "before"
+        },
+        {
+          "id": "w2",
+          "normalized": "you"
+        },
+        {
+          "id": "w3",
+          "normalized": "install"
+        },
+        {
+          "id": "w4",
+          "normalized": "the"
+        },
+        {
+          "id": "w5",
+          "normalized": "application"
+        },
+        {
+          "id": "w6",
+          "normalized": "check"
+        },
+        {
+          "id": "w7",
+          "normalized": "system"
+        },
+        {
+          "id": "w8",
+          "normalized": "requirements"
+        },
+        {
+          "id": "w9",
+          "normalized": "may"
+        },
+        {
+          "id": "w10",
+          "normalized": "need"
+        },
+        {
+          "id": "w11",
+          "normalized": "to"
+        },
+        {
+          "id": "w12",
+          "normalized": "update"
+        },
+        {
+          "id": "w13",
+          "normalized": "your"
+        },
+        {
+          "id": "w14",
+          "normalized": "operating"
+        },
+        {
+          "id": "w15",
+          "normalized": "or"
+        },
+        {
+          "id": "w16",
+          "normalized": "free"
+        },
+        {
+          "id": "w17",
+          "normalized": "up"
+        },
+        {
+          "id": "w18",
+          "normalized": "some"
+        },
+        {
+          "id": "w19",
+          "normalized": "disk"
+        },
+        {
+          "id": "w20",
+          "normalized": "space"
+        }
+      ]
+    },
+    {
+      "id": "parameters",
+      "segments": [
+        {
+          "kind": "text",
+          "value": "The function returns a list of matching items. If you omit the optional limit parameter, it returns all available results. An empty list means that no matches were found."
+        }
+      ],
+      "words": [
+        {
+          "id": "w1",
+          "normalized": "the"
+        },
+        {
+          "id": "w2",
+          "normalized": "function"
+        },
+        {
+          "id": "w3",
+          "normalized": "returns"
+        },
+        {
+          "id": "w4",
+          "normalized": "a"
+        },
+        {
+          "id": "w5",
+          "normalized": "list"
+        },
+        {
+          "id": "w6",
+          "normalized": "of"
+        },
+        {
+          "id": "w7",
+          "normalized": "matching"
+        },
+        {
+          "id": "w8",
+          "normalized": "items"
+        },
+        {
+          "id": "w9",
+          "normalized": "if"
+        },
+        {
+          "id": "w10",
+          "normalized": "you"
+        },
+        {
+          "id": "w11",
+          "normalized": "omit"
+        },
+        {
+          "id": "w12",
+          "normalized": "optional"
+        },
+        {
+          "id": "w13",
+          "normalized": "limit"
+        },
+        {
+          "id": "w14",
+          "normalized": "parameter"
+        },
+        {
+          "id": "w15",
+          "normalized": "it"
+        },
+        {
+          "id": "w16",
+          "normalized": "all"
+        },
+        {
+          "id": "w17",
+          "normalized": "available"
+        },
+        {
+          "id": "w18",
+          "normalized": "results"
+        },
+        {
+          "id": "w19",
+          "normalized": "an"
+        },
+        {
+          "id": "w20",
+          "normalized": "empty"
+        },
+        {
+          "id": "w21",
+          "normalized": "means"
+        },
+        {
+          "id": "w22",
+          "normalized": "that"
+        },
+        {
+          "id": "w23",
+          "normalized": "no"
+        },
+        {
+          "id": "w24",
+          "normalized": "matches"
+        },
+        {
+          "id": "w25",
+          "normalized": "were"
+        },
+        {
+          "id": "w26",
+          "normalized": "found"
+        }
+      ]
+    },
+    {
+      "id": "constraints",
+      "segments": [
+        {
+          "kind": "text",
+          "value": "When a request fails, the client retries it automatically unless retries have been disabled. Repeated requests may cause duplicate operations, so this behavior should only be enabled when the server can safely handle them."
+        }
+      ],
+      "words": [
+        {
+          "id": "w1",
+          "normalized": "when"
+        },
+        {
+          "id": "w2",
+          "normalized": "a"
+        },
+        {
+          "id": "w3",
+          "normalized": "request"
+        },
+        {
+          "id": "w4",
+          "normalized": "fails"
+        },
+        {
+          "id": "w5",
+          "normalized": "the"
+        },
+        {
+          "id": "w6",
+          "normalized": "client"
+        },
+        {
+          "id": "w7",
+          "normalized": "retries"
+        },
+        {
+          "id": "w8",
+          "normalized": "it"
+        },
+        {
+          "id": "w9",
+          "normalized": "automatically"
+        },
+        {
+          "id": "w10",
+          "normalized": "unless"
+        },
+        {
+          "id": "w11",
+          "normalized": "have"
+        },
+        {
+          "id": "w12",
+          "normalized": "been"
+        },
+        {
+          "id": "w13",
+          "normalized": "disabled"
+        },
+        {
+          "id": "w14",
+          "normalized": "repeated"
+        },
+        {
+          "id": "w15",
+          "normalized": "requests"
+        },
+        {
+          "id": "w16",
+          "normalized": "may"
+        },
+        {
+          "id": "w17",
+          "normalized": "cause"
+        },
+        {
+          "id": "w18",
+          "normalized": "duplicate"
+        },
+        {
+          "id": "w19",
+          "normalized": "operations"
+        },
+        {
+          "id": "w20",
+          "normalized": "so"
+        },
+        {
+          "id": "w21",
+          "normalized": "this"
+        },
+        {
+          "id": "w22",
+          "normalized": "behavior"
+        },
+        {
+          "id": "w23",
+          "normalized": "should"
+        },
+        {
+          "id": "w24",
+          "normalized": "only"
+        },
+        {
+          "id": "w25",
+          "normalized": "be"
+        },
+        {
+          "id": "w26",
+          "normalized": "enabled"
+        },
+        {
+          "id": "w27",
+          "normalized": "server"
+        },
+        {
+          "id": "w28",
+          "normalized": "can"
+        },
+        {
+          "id": "w29",
+          "normalized": "safely"
+        },
+        {
+          "id": "w30",
+          "normalized": "handle"
+        },
+        {
+          "id": "w31",
+          "normalized": "them"
+        }
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "text_id": "start",
+      "accessible": {
+        "next_text_id": "installation"
+      },
+      "difficult": {
+        "next_text_id": "simplified"
+      }
+    },
+    {
+      "text_id": "simplified",
+      "accessible": {
+        "level": "foundations",
+        "reason_code": "simplified_accessible"
+      },
+      "difficult": {
+        "level": "foundations",
+        "reason_code": "simplified_difficult"
+      }
+    },
+    {
+      "text_id": "installation",
+      "accessible": {
+        "next_text_id": "parameters"
+      },
+      "difficult": {
+        "level": "foundations",
+        "reason_code": "start_accessible"
+      }
+    },
+    {
+      "text_id": "parameters",
+      "accessible": {
+        "next_text_id": "constraints"
+      },
+      "difficult": {
+        "level": "basic_docs",
+        "reason_code": "installation_accessible"
+      }
+    },
+    {
+      "text_id": "constraints",
+      "accessible": {
+        "level": "complex_texts",
+        "reason_code": "constraints_accessible"
+      },
+      "difficult": {
+        "level": "confident_reading",
+        "reason_code": "parameters_accessible"
+      }
+    }
+  ],
+  "recommendations": [
+    {
+      "id": "foundations",
+      "title": "Основы",
+      "description": "Простые команды и частые слова о файлах, тексте и действиях."
+    },
+    {
+      "id": "basic_docs",
+      "title": "Базовая документация",
+      "description": "Короткие инструкции по установке, требованиям и настройке."
+    },
+    {
+      "id": "confident_reading",
+      "title": "Уверенное чтение",
+      "description": "Описания параметров, результатов и условий работы."
+    },
+    {
+      "id": "complex_texts",
+      "title": "Сложные тексты",
+      "description": "Исключения, ограничения и последствия действий в техническом тексте."
+    }
+  ],
+  "explanations": [
+    {
+      "reason_code": "simplified_accessible",
+      "text": "В коротком тексте о действиях с файлом знакомых слов оказалось больше. Начнём с простых команд и частой лексики"
+    },
+    {
+      "reason_code": "simplified_difficult",
+      "text": "Даже в самом коротком тексте осталось несколько незнакомых слов. Предлагаем начать с простых команд и частой лексики"
+    },
+    {
+      "reason_code": "start_accessible",
+      "text": "Начальный текст оказался доступнее инструкции по установке. Предлагаем укрепить базовую лексику"
+    },
+    {
+      "reason_code": "installation_accessible",
+      "text": "Слова в инструкции по установке в основном знакомы. Предлагаем начать с коротких инструкций и настроек"
+    },
+    {
+      "reason_code": "parameters_accessible",
+      "text": "Слова в описании параметров в основном знакомы. Предлагаем начать с условий работы и результатов"
+    },
+    {
+      "reason_code": "constraints_accessible",
+      "text": "В самом сложном тексте вы отметили немного незнакомых слов. Можно начать с исключений и ограничений"
+    }
+  ]
+}
