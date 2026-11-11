@@ -19,3 +19,8 @@ build/
 
 # Local history of the cancelled project; not part of this product.
 /docs/archive/financial-reconciliation/
+
+# Local planning history excluded from the published documentation.
+/docs/archive/setup/initial-design.md
+/docs/archive/setup/initial-plan.md
+/docs/product-scope.md

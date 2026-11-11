@@ -10,7 +10,7 @@
 
 **Стек:** Python 3.13, uv, FastAPI/Pydantic, PostgreSQL, SQLAlchemy 2/psycopg 3, Alembic, pwdlib/Argon2; React/TypeScript/Vite; Ruff, mypy, pytest, HTTPX, Playwright, GitHub Actions.
 
-**Основание:** [утверждённый дизайн](design.md), [правила и тексты](onboarding-content.md), [проверка дизайна](design-validation.md). [Прежний выполненный план настройки](archive/setup/initial-plan.md) сохранён отдельно. Полный курс и уроки не входят.
+**Основание:** [утверждённый дизайн](design.md), [правила и тексты](onboarding-content.md), [проверка дизайна](design-validation.md). Прежний план настройки исключён из Git по решению пользователя. Полный курс и уроки не входят.
 
 ## Общие ограничения
 
