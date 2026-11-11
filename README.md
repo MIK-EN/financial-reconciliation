@@ -105,7 +105,6 @@ GitHub Actions на push и pull request восстанавливает locked-�
 
 ## Документация
 
-- [Договор работы](AGENTS.md)
 - [Технический дизайн](docs/design.md)
 - [Пошаговый план](docs/plan.md)
 - [Тексты и методические ограничения](docs/onboarding-content.md)
