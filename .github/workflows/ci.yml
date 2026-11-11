@@ -41,3 +41,6 @@ jobs:
 
       - name: Check types
         run: uv run --locked mypy src/reconciliation
+
+      - name: Unit tests
+        run: uv run --locked pytest tests/unit -q
