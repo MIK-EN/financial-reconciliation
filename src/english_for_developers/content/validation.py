@@ -5,8 +5,8 @@ import json
 import re
 from typing import cast
 
-from reconciliation.content.normalization import normalize_word, split_text
-from reconciliation.content.schema import (
+from english_for_developers.content.normalization import normalize_word, split_text
+from english_for_developers.content.schema import (
     ContentBundle,
     DisplaySegment,
     Explanation,
@@ -14,7 +14,7 @@ from reconciliation.content.schema import (
     TextDefinition,
     WordDefinition,
 )
-from reconciliation.onboarding.types import ROUTING_V1, Level, Route, TextId, Transition
+from english_for_developers.onboarding.types import ROUTING_V1, Level, Route, TextId, Transition
 
 _TEXT_IDS = frozenset(route.text_id for route in ROUTING_V1)
 _LEVELS = frozenset(("foundations", "basic_docs", "confident_reading", "complex_texts"))
@@ -192,14 +192,15 @@ def validate_bundle(raw: object) -> ContentBundle:
         )
     if len(explanations) != len(_REASONS) or {e.reason_code for e in explanations} != _REASONS:
         raise ValueError("Missing or repeated explanation")
-    canonical = json.dumps(
+    canonical_json = json.dumps(
         raw, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
-    ).encode("utf-8")
+    )
     return ContentBundle(
         version,
         "surface-v1",
         "routing-v1",
-        hashlib.sha256(canonical).hexdigest(),
+        hashlib.sha256(canonical_json.encode("utf-8")).hexdigest(),
+        canonical_json,
         texts,
         routes,
         tuple(recommendations),

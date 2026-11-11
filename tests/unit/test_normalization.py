@@ -1,6 +1,6 @@
 import pytest
 
-from reconciliation.content.normalization import normalize_word
+from english_for_developers.content.normalization import normalize_word
 
 
 @pytest.mark.parametrize(

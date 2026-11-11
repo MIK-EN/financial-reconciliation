@@ -1,7 +1,7 @@
 import pytest
 
-from reconciliation.content.schema import TextDefinition, WordDefinition
-from reconciliation.onboarding.rules import evaluate_answer, next_transition
+from english_for_developers.content.schema import TextDefinition, WordDefinition
+from english_for_developers.onboarding.rules import evaluate_answer, next_transition
 
 COUNTS = {"simplified": 8, "start": 14, "installation": 20, "parameters": 26, "constraints": 31}
 

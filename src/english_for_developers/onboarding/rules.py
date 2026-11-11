@@ -1,7 +1,7 @@
 """Pure answer evaluation; HTTP and persistence are deliberately outside this module."""
 
-from reconciliation.content.schema import TextDefinition
-from reconciliation.onboarding.types import (
+from english_for_developers.content.schema import TextDefinition
+from english_for_developers.onboarding.types import (
     ROUTING_V1,
     AnswerEvaluation,
     AnswerMode,
