@@ -19,6 +19,10 @@ from english_for_developers.storage.models import (
 )
 
 
+class InvalidAnswer(ValueError):
+    """The answer body does not satisfy the content contract."""
+
+
 @dataclass(frozen=True)
 class ActiveRun:
     id: UUID
@@ -171,7 +175,10 @@ def submit_answer(
     if run.content_version != content_version:
         raise ValueError("stale run state")
     text = validate_bundle(bundle.content_json).get_text(step.text_id)
-    evaluation = evaluate_answer(text, mode, word_ids, run.threshold_percent)  # type: ignore[arg-type]
+    try:
+        evaluation = evaluate_answer(text, mode, word_ids, run.threshold_percent)  # type: ignore[arg-type]
+    except ValueError as exc:
+        raise InvalidAnswer(str(exc)) from exc
     if step.answered_at is not None:
         if step.answer_mode == evaluation.mode and step.unknown_word_ids == list(
             evaluation.word_ids

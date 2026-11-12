@@ -188,3 +188,29 @@ def test_completed_run_allows_level_selection(client: Any) -> None:
     assert response.status_code == 200
     assert response.json()["selected_level"] == "basic_docs"
     assert response.json()["revision"] == 3
+
+
+def test_unknown_word_id_is_rejected_without_changing_run(client: Any) -> None:
+    headers = {"Origin": "http://testserver"}
+    session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
+    started = client.post(
+        "/api/v1/onboarding",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={},
+    ).json()
+
+    response = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={
+            "step_id": started["step"]["id"],
+            "mode": "unknown_words",
+            "word_ids": ["unknown"],
+            "content_version": started["bundle_version"],
+        },
+    )
+    state = client.get(f"/api/v1/onboarding/{started['id']}")
+
+    assert response.status_code == 422
+    assert state.json()["revision"] == 0
+    assert state.json()["step"]["text_id"] == "start"

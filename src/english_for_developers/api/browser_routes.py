@@ -30,6 +30,7 @@ from english_for_developers.api.schemas import (
 from english_for_developers.onboarding.service import (
     ActiveRun,
     CompletedRun,
+    InvalidAnswer,
     read_run,
     select_level,
     start_run,
@@ -210,6 +211,8 @@ def create_answer(
             body.content_version,
             now,
         )
+    except InvalidAnswer as exc:
+        raise HTTPException(status_code=422, detail="invalid answer") from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail="answer cannot be accepted") from exc
     response.headers["Cache-Control"] = "no-store"
