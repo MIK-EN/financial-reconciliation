@@ -2,7 +2,7 @@
 
 > Для исполнителя: читать локальный договор работы (не публикуется), дизайн и контент; применять superpowers:executing-plans и выполнять задачи по чекбоксам. Коммиты и push — только по запросу пользователя.
 
-**Статус:** согласован пользователем 2026-11-11 вместе с порядком и форматом работы: один проверяемый шаг и краткий разбор результата. Дизайн утверждён ранее. Задачи 1 и 2 реализованы; локальные проверки и GitHub Actions для merge-коммита шага 2 прошли.
+**Статус:** согласован пользователем 2026-11-11 вместе с порядком и форматом работы: один проверяемый шаг и краткий разбор результата. Дизайн утверждён ранее. Задачи 1–3 реализованы и слиты в `main`; итоговый CI merge-коммита задачи 3 прошёл. Следующая задача — 4.
 
 **Цель:** работающий сайт с анонимным адаптивным подбором сложности, восстановлением прохождения, рекомендацией и необязательным сохранением в аккаунт.
 
@@ -23,8 +23,8 @@
 - JSON не больше 16 KiB; лишние поля запрещены. Origin и CSRF обязательны по правилам дизайна; токены и пароли не попадают в логи и sessionStorage.
 - Блокировки: browser_sessions по ID → users → onboarding_runs по ID; доступ и сроки повторно проверяются внутри транзакции. Session отдельная на запрос, блокирующие обработчики — `def`.
 - Хост, домен, бюджет и PostgreSQL major для публикации пока не выбраны. Для локального этапа фиксируем одну поддерживаемую major после проверки совместимости; перед размещением используем её же либо отдельно проверяем смену.
-- Имена файлов и интерфейсов ниже — предлагаемые реализации. Python-пакет переименован из `reconciliation` в `english_for_developers`; публичное имя GitHub-репозитория сохраняется до отдельного решения.
-- Перед каждой задачей проверяем рабочую копию и читаем актуальную карточку; переводим её в «В работе». Завершаем обновлением STATUS и Notion с фактическими проверками. Не устанавливаем зависимости и не пишем продуктовый код до согласования этого плана.
+- Имена файлов и интерфейсов ниже соответствуют пакету `english_for_developers`; имя публичного репозитория пока сохраняется прежним.
+- Перед каждой задачей проверяем рабочую копию и актуальные локальные документы. Завершаем обновлением STATUS с фактическими проверками. Не устанавливаем зависимости и не пишем продуктовый код до согласования этого плана.
 
 ## Что проверить особенно
 
@@ -53,26 +53,26 @@
 
 ## 2. PostgreSQL, миграции и неизменяемый импорт
 
-**Зависит от:** 1. **Создать:** `src/english_for_developers/storage/{database,models}.py`, `src/english_for_developers/content/importer.py`, `src/english_for_developers/cli.py`, `alembic.ini`, `migrations/env.py`, `migrations/versions/0001_onboarding.py`, `compose.yaml`, `.env.example`, `tests/integration/{conftest,test_schema,test_content_import}.py`. **Обновить:** pyproject/uv.lock, README, CI.
+**Зависит от:** 1. **Создать:** `src/english_for_developers/storage/{database,models}.py`, `src/english_for_developers/content/importer.py`, `src/english_for_developers/cli.py`, `alembic.ini`, `migrations/env.py`, `migrations/versions/0001_onboarding_storage.py`, `compose.yaml`, `.env.example`, `tests/integration/{conftest,test_schema,test_content_import}.py`. **Обновить:** pyproject/uv.lock, README, CI.
 
 **Интерфейсы:** `make_session_factory(database_url: str) -> sessionmaker[Session]`; `import_bundle(session: Session, bundle: ContentBundle, *, activate: bool, threshold_percent: int) -> ImportResult`. Импорт не коммитит сам — транзакцией владеет CLI. CLI: `python -m english_for_developers.cli content validate PATH` и `content import PATH --activate --threshold-percent 20`.
 
-- [x] Через Context7 проверить конфигурацию SQLAlchemy 2, psycopg 3, Alembic и контейнерного запуска; зафиксировать совместимые версии и образ PostgreSQL одной major для local/CI. Добавлять зависимости по мере потребности, не обновлять всё окружение попутно.
-- [x] Написать интеграционные тесты ограничений из design §6: шесть таблиц, уникальные логины/хеши сессий, один run на guest, один незаполненный step, ordinal 1–4, уникальный text_id, целостность ответа и current_run_id своего завершённого run. Границы, которые нельзя выразить локальным CHECK, проверять схемой/транзакцией и отдельными отрицательными тестами.
-- [x] Проверить ограничения моделями, именованными ограничениями и миграцией. PostgreSQL-тестовая БД изолирована суффиксом `_test`; UTC с timezone; `create_all` не используется. Реальная миграция в сервер пока не запущена.
-- [x] Добавить тесты импорта: первая публикация; тот же ID/хеш без изменений; другой хеш того же ID — отказ; ошибочный пакет не переключает active; новая версия/порог не меняет существующий run; FK запрещает удаление используемой версии. Реализовать атомарную публикацию и CLI.
-- [x] На чистой тестовой БД выполнить `uv run --locked alembic upgrade head`, `uv run --locked alembic check`, затем `uv run --locked pytest tests/integration/test_schema.py tests/integration/test_content_import.py -q`. Повторить импорт и проверить прежние данные. `alembic check` не заменяет проверки ограничений. CI получает PostgreSQL service и эти проверки уже на этом шаге. Выполнено на PostgreSQL 17.11: миграция и проверка схемы прошли, integration suite — 17 passed.
+- [x] Через Context7 проверена конфигурация SQLAlchemy 2, psycopg 3, Alembic и контейнерного запуска; закреплён PostgreSQL 17 для local/CI.
+- [x] Добавлены интеграционные тесты ограничений design §6: шесть таблиц, уникальные логины/хеши сессий, один run на guest, один незаполненный step, ordinal 1–4, уникальный text_id, целостность ответа и current_run_id своего завершённого run.
+- [x] Созданы модели, именованные ограничения и миграция. PostgreSQL-тестовая БД изолирована суффиксом `_test`; UTC с timezone; `create_all` не используется.
+- [x] Добавлены тесты атомарного импорта: первая публикация, безопасный повтор того же ID/хеша, отказ при смене хеша и сохранение прежней активной версии при ошибке.
+- [x] На PostgreSQL 17.11 выполнены `alembic upgrade head`, `alembic check` и integration suite: 17 проверок прошли. CI получил PostgreSQL service, миграции, проверку схемы и integration-тесты.
 
 ## 3. Гостевая сессия и защищённая основа API
 
-**Зависит от:** 2. **Создать:** `src/english_for_developers/{app,settings}.py`, `src/english_for_developers/api/{schemas,errors,dependencies,browser_routes}.py`, `src/english_for_developers/accounts/{sessions,csrf}.py`, `tests/api/{conftest,test_browser_session,test_security}.py`. **Обновить:** зависимости FastAPI, HTTPX, запуск backend в README.
+**Зависит от:** 2. **Создать:** `src/english_for_developers/{app,settings}.py`, `src/english_for_developers/api/{schemas,dependencies,browser_routes}.py`, `src/english_for_developers/accounts/sessions.py`, `tests/api/{conftest,test_browser_session,test_security}.py`. **Обновить:** зависимости FastAPI, HTTPX, запуск backend в README.
 
 **Интерфейсы:** `create_app() -> FastAPI`; `issue_session_token() -> str`; `hash_session_token(token: str) -> str`; `require_origin(origin: str | None, expected_origin: str) -> None`. DTO `BrowserContext` содержит доступные CSRF и ID прохождений; `ApiError` — code/message/request_id. Аутентификацию и владение изменяющая операция перепроверяет под блокировками, а не только dependency.
 
-- [ ] Проверить через Context7 актуальные FastAPI/Pydantic/HTTPX API и конфигурацию. Написать падающие тесты POST `/api/v1/browser-session` и GET `/api/v1/context`: повтор использует cookie, отсутствующая/истёкшая/отозванная cookie не даёт доступа, время фиксируется тестовой зависимостью.
-- [ ] Реализовать 7-суточные серверные сессии; production `__Host-`/HttpOnly/Secure/SameSite=Lax/Path=/, dev с отдельными именами. В БД только хеш токена; CSRF остаётся отдельным секретом. Создание session проверяет Origin, остальные изменения — соответствующий CSRF.
-- [ ] Добавить и пройти тесты missing/null/чужого Origin, неверного CSRF, лишних полей, тела свыше 16 KiB (в том числе без достоверного Content-Length), безопасной ошибки без пароля и токенов, `Cache-Control: no-store`. Не отражать входные секреты в validation details.
-- [ ] Выполнить `uv run --locked pytest tests/api/test_browser_session.py tests/api/test_security.py -q` и общие Python-проверки. Готово: API реально работает с PostgreSQL, но прохождение пока не реализовано; контекст не раскрывает чужие данные.
+- [x] Через Context7 проверены актуальные FastAPI/Pydantic/HTTPX API. Добавлены RED-тесты POST `/api/v1/browser-session` и GET `/api/v1/context` для выпуска, повтора и отсутствия гостевой сессии; время фиксируется dependency.
+- [x] Реализованы 7-суточные серверные сессии: в БД хранится хеш токена и отдельный CSRF-секрет; cookie имеет отдельные dev/production параметры. Создание session проверяет Origin, повторный POST с действующей cookie — ещё и CSRF.
+- [x] Добавлены проверки missing/null/чужого Origin, неверного CSRF, лишних полей, тела свыше 16 KiB при ложном `Content-Length`, безопасных validation errors и `Cache-Control: no-store`.
+- [x] API реально проверен с PostgreSQL: 19 integration-тестов прошли. После CSRF-дополнения полный Python suite прошёл: 221 тест; Ruff, форматирование и mypy успешны. Финальный CI merge-коммита задачи 3 также успешен. Прохождение пока не реализовано; контекст не раскрывает чужие данные.
 
 ## 4. Прохождение, повторные ответы и выбор сложности
 
@@ -146,7 +146,7 @@
 
 ## 10. Публичное демо и итоговая приёмка
 
-**Зависит от:** 9 и решения пользователя о хосте/домене/бюджете. **Обновить:** deploy-конфигурацию под выбранный хост, runbook, README, STATUS и Notion. Переименование репозитория — отдельный запрос.
+**Зависит от:** 9 и решения пользователя о хосте/домене/бюджете. **Обновить:** deploy-конфигурацию под выбранный хост, runbook, README и STATUS. Переименование репозитория — отдельный запрос.
 
 - [ ] Подготовить один рекомендуемый вариант размещения с составом ресурсов, ценой, доменом/TLS и ограничениями; сверить актуальную документацию через Context7. Согласовать конкретные ресурсы и бюджет до создания платных ресурсов и публичного развёртывания.
 - [ ] После разрешения развернуть проверенную сборку: тот же PostgreSQL major, private DB, постоянное хранилище, HTTPS, секреты окружения, явные миграции и импорт. Проверить доверенный proxy, лимиты и production-cookie на хосте.
@@ -160,7 +160,7 @@
 
 С задачи 2 локально работают `uv run --locked alembic upgrade head`, `uv run --locked alembic check` и CLI проверки/импорта; команды и настройка TEST_DATABASE_URL описаны в README. С задачи 7 из frontend: `npm ci`, `npm run typecheck`, `npm run build`, `npm run test:e2e` — будущие команды, появятся с реализацией frontend.
 
-В каждой задаче цикл: отрицательный тест → подтверждённое падение → минимальная реализация → успешная проверка → документация/Notion. Не добавлять тесты ради каркаса. Результат без проверки не помечать готовым. Commit/push и новая публичная публикация требуют соответствующего запроса; их отсутствие отдельно отражать, не скрывать за локальным успехом.
+В каждой задаче цикл: отрицательный тест → подтверждённое падение → минимальная реализация → успешная проверка → документация. Не добавлять тесты ради каркаса. Результат без проверки не помечать готовым. Commit/push и новая публичная публикация требуют соответствующего запроса; их отсутствие отдельно отражать, не скрывать за локальным успехом.
 
 ## Сверка покрытия дизайна
 
