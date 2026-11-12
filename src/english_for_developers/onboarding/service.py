@@ -129,7 +129,7 @@ def start_run(db: Session, browser_session: BrowserSession, now: datetime) -> Ac
 
 def read_run(
     db: Session, browser_session: BrowserSession, run_id: UUID, now: datetime
-) -> ActiveRun:
+) -> ActiveRun | CompletedRun:
     """Return an active run only to its current anonymous-session owner."""
     if browser_session.revoked_at is not None or browser_session.expires_at <= now:
         raise ValueError("anonymous session is unavailable")
@@ -139,7 +139,21 @@ def read_run(
             OnboardingRun.anonymous_session_id == browser_session.id,
         )
     )
-    if run is None or run.status != "active":
+    if run is None:
+        raise ValueError("run is unavailable")
+    if run.status == "completed":
+        if run.recommended_level is None or run.selected_level is None or run.reason_code is None:
+            raise ValueError("completed run is invalid")
+        return CompletedRun(
+            id=run.id,
+            revision=run.revision,
+            bundle_version=run.content_version,
+            expires_at=run.expires_at,
+            recommended_level=run.recommended_level,
+            selected_level=run.selected_level,
+            reason_code=run.reason_code,
+        )
+    if run.status != "active":
         raise ValueError("run is unavailable")
     step = db.get(OnboardingStep, run.current_step_id)
     if step is None:

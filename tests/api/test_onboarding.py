@@ -149,6 +149,11 @@ def test_last_answer_completes_run_with_recommendation(client: Any) -> None:
     assert response.json()["selected_level"] == "foundations"
     assert response.json()["reason_code"] == "simplified_accessible"
 
+    reread = client.get(f"/api/v1/onboarding/{started['id']}")
+    assert reread.status_code == 200
+    assert reread.json()["status"] == "completed"
+    assert reread.json()["recommended_level"] == "foundations"
+
 
 def test_completed_run_allows_level_selection(client: Any) -> None:
     headers = {"Origin": "http://testserver"}

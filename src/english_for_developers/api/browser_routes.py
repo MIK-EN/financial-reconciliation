@@ -161,7 +161,7 @@ def create_onboarding_run(
     return _active_run_response(run)
 
 
-@router.get("/onboarding/{run_id}", response_model=ActiveRunResponse)
+@router.get("/onboarding/{run_id}", response_model=ActiveRunResponse | CompletedRunResponse)
 def get_onboarding_run(
     run_id: UUID,
     response: Response,
@@ -169,7 +169,7 @@ def get_onboarding_run(
     db: Session = Depends(get_db),  # noqa: B008
     now: datetime = Depends(get_now),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
-) -> ActiveRunResponse:
+) -> ActiveRunResponse | CompletedRunResponse:
     session = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
     if session is None:
         raise HTTPException(status_code=404, detail="onboarding run not found")
@@ -178,7 +178,7 @@ def get_onboarding_run(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail="onboarding run not found") from exc
     response.headers["Cache-Control"] = "no-store"
-    return _active_run_response(run)
+    return _run_response(run)
 
 
 @router.post(
