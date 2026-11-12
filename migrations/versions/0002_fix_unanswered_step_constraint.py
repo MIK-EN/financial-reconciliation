@@ -35,9 +35,7 @@ def upgrade() -> None:
     )
     op.execute(
         "ALTER TABLE onboarding_steps ADD CONSTRAINT "
-        "ck_onboarding_steps_ck_onboarding_steps_answer_consistency CHECK ("
-        + _CONDITION
-        + ")"
+        "ck_onboarding_steps_ck_onboarding_steps_answer_consistency CHECK (" + _CONDITION + ")"
     )
 
 

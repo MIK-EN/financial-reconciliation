@@ -295,3 +295,8 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 - Добавлен плановый API-тест: первый ответ с 10 неизвестными словами переводит run с `start` на `simplified`, а повтор тех же ID в другом порядке валидируется по исходному `start` и возвращает тот же актуальный шаг без новой revision.
 - Поведение уже было корректным. Mutation-проверка с временной валидацией по текущему simplified-тексту дала ожидаемый 422; после восстановления исходной реализации тест снова прошёл с 200. Продакшен-код не менялся.
 - Проверки: полный `pytest tests -q` с disposable PostgreSQL — 233 passed; Ruff lint и mypy успешны; тест отформатирован. Единственный общий format-check failure остаётся в ранее закоммиченной миграции `0002_fix_unanswered_step_constraint.py`.
+
+## Онбординг 4: восстановление общего format-check, 2026-11-12
+
+- Без изменения SQL и поведения отформатировано выражение миграции `0002_fix_unanswered_step_constraint.py`, которое оставалось единственной причиной падения общего Ruff format-check.
+- Проверки: Ruff lint успешен; `ruff format --check .` — 51 file already formatted; mypy успешен; Alembic показывает `0002_unanswered_step (head)` и отсутствие новых операций; полный `pytest tests -q` с disposable PostgreSQL — 233 passed.
