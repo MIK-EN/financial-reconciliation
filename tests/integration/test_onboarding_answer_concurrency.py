@@ -9,7 +9,7 @@ from threading import Barrier
 from time import monotonic
 from uuid import uuid4
 
-from sqlalchemy import Engine, select, text
+from sqlalchemy import Engine, func, select, text
 from sqlalchemy.orm import Session
 
 from english_for_developers.content.importer import import_bundle
@@ -135,3 +135,98 @@ def test_concurrent_identical_answers_create_one_transition(test_engine: Engine)
         assert current.text_id == "installation"
         assert current.answer_mode is None
         assert current.answered_at is None
+
+
+def test_concurrent_different_answers_allow_only_one_transition(test_engine: Engine) -> None:
+    now = datetime.now(UTC)
+    bundle = validate_bundle(json.loads(CONTENT_PATH.read_text(encoding="utf-8")))
+    owner_id = uuid4()
+    with Session(test_engine) as setup:
+        import_bundle(setup, bundle, activate=True, threshold_percent=20)
+        owner = BrowserSession(
+            id=owner_id,
+            kind="anonymous",
+            token_hash=uuid4().hex + uuid4().hex,
+            csrf_secret="synthetic-csrf-secret",
+            created_at=now,
+            expires_at=now + timedelta(days=7),
+        )
+        setup.add(owner)
+        setup.commit()
+        initial = start_run(setup, owner, now)
+
+    ready = Barrier(3, timeout=10)
+    backend_pids: Queue[int] = Queue()
+
+    def answer(mode: str, word_ids: list[str]) -> str:
+        with Session(test_engine) as worker:
+            worker.execute(text("SET LOCAL statement_timeout = '15s'"))
+            pid = worker.scalar(text("SELECT pg_backend_pid()"))
+            assert isinstance(pid, int)
+            owner = worker.get(BrowserSession, owner_id)
+            assert owner is not None
+            backend_pids.put(pid)
+            ready.wait()
+            try:
+                submit_answer(
+                    worker,
+                    owner,
+                    initial.id,
+                    initial.step_id,
+                    mode,
+                    word_ids,
+                    initial.bundle_version,
+                    now,
+                )
+                return "accepted"
+            except ValueError:
+                return "conflict"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        with Session(test_engine) as blocker:
+            blocker.scalar(
+                select(OnboardingRun).where(OnboardingRun.id == initial.id).with_for_update()
+            )
+            futures = [
+                executor.submit(answer, "all_known", []),
+                executor.submit(answer, "unknown_words", ["w1"]),
+            ]
+            try:
+                ready.wait()
+                first_pid = backend_pids.get(timeout=10)
+                second_pid = backend_pids.get(timeout=10)
+                assert first_pid != second_pid
+                deadline = monotonic() + 5
+                with test_engine.connect() as observer:
+                    while True:
+                        blocked = observer.scalar(
+                            text(
+                                "SELECT count(*) FROM pg_stat_activity "
+                                "WHERE pid IN (:first_pid, :second_pid) "
+                                "AND cardinality(pg_blocking_pids(pid)) > 0"
+                            ),
+                            {"first_pid": first_pid, "second_pid": second_pid},
+                        )
+                        if blocked == 2:
+                            break
+                        assert monotonic() < deadline, "Both answers must overlap at the row lock"
+                        for future in futures:
+                            if future.done():
+                                future.result()
+            finally:
+                blocker.rollback()
+        results = [future.result(timeout=20) for future in futures]
+
+    assert sorted(results) == ["accepted", "conflict"]
+    with Session(test_engine) as verification:
+        run = verification.get(OnboardingRun, initial.id)
+        assert run is not None
+        assert run.revision == 1
+        assert (
+            verification.scalar(
+                select(func.count())
+                .select_from(OnboardingStep)
+                .where(OnboardingStep.run_id == initial.id)
+            )
+            == 2
+        )
