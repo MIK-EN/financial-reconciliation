@@ -153,14 +153,25 @@ def submit_answer(
     )
     if run is None or run.status != "active" or run.expires_at <= now:
         raise ValueError("run is unavailable")
-    if run.content_version != content_version or run.current_step_id != step_id:
-        raise ValueError("stale run state")
     step = db.get(OnboardingStep, step_id)
     bundle = db.get(ContentBundle, run.content_version)
     if step is None or bundle is None:
         raise ValueError("run state is unavailable")
+    if run.content_version != content_version:
+        raise ValueError("stale run state")
     text = validate_bundle(bundle.content_json).get_text(step.text_id)
     evaluation = evaluate_answer(text, mode, word_ids, run.threshold_percent)  # type: ignore[arg-type]
+    if step.answered_at is not None:
+        if step.answer_mode == evaluation.mode and step.unknown_word_ids == list(
+            evaluation.word_ids
+        ):
+            current_step = db.get(OnboardingStep, run.current_step_id)
+            if current_step is None:
+                raise ValueError("run state is unavailable")
+            return _active_run(db, run, current_step, created=False)
+        raise ValueError("answer is already recorded")
+    if run.current_step_id != step_id:
+        raise ValueError("stale run state")
     transition = next_transition(text.id, evaluation.accessible)
     if transition.next_text_id is None:
         raise ValueError("completed runs are not implemented")

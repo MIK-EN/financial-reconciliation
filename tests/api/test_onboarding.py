@@ -77,3 +77,36 @@ def test_answer_moves_run_to_next_text(client: Any) -> None:
     assert response.json()["revision"] == 1
     assert response.json()["step"]["ordinal"] == 2
     assert response.json()["step"]["text_id"] == "installation"
+
+
+def test_repeating_same_answer_returns_current_state(client: Any) -> None:
+    headers = {"Origin": "http://testserver"}
+    created_session = client.post("/api/v1/browser-session", headers=headers, json={})
+    csrf_token = created_session.json()["csrf_token"]
+    started = client.post(
+        "/api/v1/onboarding",
+        headers={**headers, "X-CSRF-Token": csrf_token},
+        json={},
+    ).json()
+    answer = {
+        "step_id": started["step"]["id"],
+        "mode": "all_known",
+        "word_ids": [],
+        "content_version": started["bundle_version"],
+    }
+
+    first = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers={**headers, "X-CSRF-Token": csrf_token},
+        json=answer,
+    )
+    repeated = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers={**headers, "X-CSRF-Token": csrf_token},
+        json=answer,
+    )
+
+    assert first.status_code == 200
+    assert repeated.status_code == 200
+    assert repeated.json()["revision"] == 1
+    assert repeated.json()["step"]["text_id"] == "installation"

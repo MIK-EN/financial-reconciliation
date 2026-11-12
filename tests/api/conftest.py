@@ -23,7 +23,7 @@ class FakeSession:
         bundle = validate_bundle(raw_bundle)
         self.browser_session: BrowserSession | None = None
         self.run: OnboardingRun | None = None
-        self.step: OnboardingStep | None = None
+        self.steps: dict[object, OnboardingStep] = {}
         self.bundle = ContentBundle(
             version=bundle.bundle_version,
             content_hash=bundle.content_hash,
@@ -49,8 +49,8 @@ class FakeSession:
             return self.settings
         if model is ContentBundle and key == self.bundle.version:
             return self.bundle
-        if model is OnboardingStep and self.step is not None and key == self.step.id:
-            return self.step
+        if model is OnboardingStep:
+            return self.steps.get(key)
         return None
 
     def add(self, record) -> None:
@@ -59,7 +59,7 @@ class FakeSession:
         elif isinstance(record, OnboardingRun):
             self.run = record
         elif isinstance(record, OnboardingStep):
-            self.step = record
+            self.steps[record.id] = record
         else:
             raise AssertionError(f"Unexpected record: {record}")
 
