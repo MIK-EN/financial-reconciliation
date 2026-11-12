@@ -1,4 +1,7 @@
+from datetime import UTC, datetime, timedelta
 from typing import Any
+
+from english_for_developers.api.dependencies import get_now
 
 
 def test_browser_session_is_created_and_reused(client: Any) -> None:
@@ -28,3 +31,18 @@ def test_context_is_available_after_session_creation(client: Any) -> None:
 
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
+
+
+def test_session_expiry_uses_injected_time(client: Any, app: Any) -> None:
+    fixed_now = datetime(2030, 1, 2, 3, 4, 5, tzinfo=UTC)
+    app.dependency_overrides[get_now] = lambda: fixed_now
+
+    response = client.post(
+        "/api/v1/browser-session",
+        headers={"Origin": "http://testserver"},
+        json={},
+    )
+
+    assert response.status_code == 201
+    expires_at = datetime.fromisoformat(response.json()["expires_at"].replace("Z", "+00:00"))
+    assert expires_at == fixed_now + timedelta(days=7)

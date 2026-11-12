@@ -18,14 +18,20 @@ class FakeSession:
 
 
 @pytest.fixture
-def client() -> Iterator[object]:
-    from fastapi.testclient import TestClient
-
-    from english_for_developers.api.dependencies import get_db
+def app():
     from english_for_developers.app import create_app
 
     fake_session = FakeSession()
-    app = create_app()
-    app.dependency_overrides[get_db] = lambda: fake_session
+    application = create_app()
+    from english_for_developers.api.dependencies import get_db
+
+    application.dependency_overrides[get_db] = lambda: fake_session
+    return application
+
+
+@pytest.fixture
+def client(app) -> Iterator[object]:
+    from fastapi.testclient import TestClient
+
     with TestClient(app, base_url="http://testserver") as test_client:
         yield test_client

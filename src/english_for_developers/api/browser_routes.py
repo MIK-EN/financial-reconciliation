@@ -1,6 +1,6 @@
 """Guest browser session endpoints."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
@@ -14,7 +14,7 @@ from english_for_developers.accounts.sessions import (
     require_origin,
     session_cookie_options,
 )
-from english_for_developers.api.dependencies import get_db, get_settings
+from english_for_developers.api.dependencies import get_db, get_now, get_settings
 from english_for_developers.api.schemas import (
     BrowserContextResponse,
     BrowserSessionResponse,
@@ -24,10 +24,6 @@ from english_for_developers.settings import Settings
 from english_for_developers.storage.models import BrowserSession
 
 router = APIRouter(prefix="/api/v1")
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 def _active_session(db: Session, token: str | None, now: datetime) -> BrowserSession | None:
@@ -71,6 +67,7 @@ def create_browser_session(
     request: Request,
     origin: str | None = Header(default=None),
     db: Session = Depends(get_db),  # noqa: B008
+    now: datetime = Depends(get_now),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> BrowserSessionResponse:
     del body
@@ -79,7 +76,6 @@ def create_browser_session(
     except ValueError as exc:
         raise HTTPException(status_code=403, detail="origin not allowed") from exc
 
-    now = _now()
     session, token, created = _ensure_session(
         db, settings, request.cookies.get(settings.session_cookie_name), now
     )
@@ -102,10 +98,11 @@ def get_context(
     response: Response,
     request: Request,
     db: Session = Depends(get_db),  # noqa: B008
+    now: datetime = Depends(get_now),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> BrowserContextResponse:
     response.headers["Cache-Control"] = "no-store"
-    session = _active_session(db, request.cookies.get(settings.session_cookie_name), _now())
+    session = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
     if session is None:
         return BrowserContextResponse()
     return BrowserContextResponse(
