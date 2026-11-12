@@ -112,6 +112,42 @@ def test_repeating_same_answer_returns_current_state(client: Any) -> None:
     assert repeated.json()["step"]["text_id"] == "installation"
 
 
+def test_retry_start_with_ten_unknown_after_simplified(client: Any) -> None:
+    headers = {"Origin": "http://testserver"}
+    session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
+    started = client.post(
+        "/api/v1/onboarding",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={},
+    ).json()
+    answer = {
+        "step_id": started["step"]["id"],
+        "mode": "unknown_words",
+        "word_ids": ["w10", "w9", "w8", "w7", "w6", "w5", "w4", "w3", "w2", "w1"],
+        "content_version": started["bundle_version"],
+    }
+
+    first = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json=answer,
+    )
+    repeated = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={
+            **answer,
+            "word_ids": ["w1", "w2", "w3", "w4", "w5", "w6", "w7", "w8", "w9", "w10"],
+        },
+    )
+
+    assert first.status_code == 200
+    assert first.json()["step"]["text_id"] == "simplified"
+    assert repeated.status_code == 200
+    assert repeated.json() == first.json()
+    assert repeated.json()["revision"] == 1
+
+
 def test_last_answer_completes_run_with_recommendation(client: Any) -> None:
     headers = {"Origin": "http://testserver"}
     session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
