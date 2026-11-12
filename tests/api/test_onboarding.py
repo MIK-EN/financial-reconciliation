@@ -155,6 +155,48 @@ def test_last_answer_completes_run_with_recommendation(client: Any) -> None:
     assert reread.json()["recommended_level"] == "foundations"
 
 
+def test_repeating_last_answer_returns_completed_state(client: Any) -> None:
+    headers = {"Origin": "http://testserver"}
+    session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
+    started = client.post(
+        "/api/v1/onboarding",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={},
+    ).json()
+    simplified = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={
+            "step_id": started["step"]["id"],
+            "mode": "unknown_words",
+            "word_ids": ["w1", "w2", "w3"],
+            "content_version": started["bundle_version"],
+        },
+    ).json()
+    last_answer = {
+        "step_id": simplified["step"]["id"],
+        "mode": "all_known",
+        "word_ids": [],
+        "content_version": started["bundle_version"],
+    }
+
+    completed = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json=last_answer,
+    )
+    repeated = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json=last_answer,
+    )
+
+    assert completed.status_code == 200
+    assert repeated.status_code == 200
+    assert repeated.json() == completed.json()
+    assert repeated.json()["revision"] == 2
+
+
 def test_completed_run_allows_level_selection(client: Any) -> None:
     headers = {"Origin": "http://testserver"}
     session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
