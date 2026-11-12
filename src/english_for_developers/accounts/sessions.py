@@ -2,10 +2,20 @@
 
 import secrets
 from hashlib import sha256
+from typing import Literal, TypedDict
 
 from english_for_developers.settings import Settings
 
 TOKEN_BYTES = 32
+
+
+class SessionCookieOptions(TypedDict):
+    key: str
+    httponly: bool
+    secure: bool
+    samesite: Literal["lax", "strict", "none"]
+    path: str
+    max_age: int
 
 
 def issue_session_token() -> str:
@@ -25,7 +35,7 @@ def require_origin(origin: str | None, expected_origin: str) -> None:
         raise ValueError("origin not allowed")
 
 
-def session_cookie_options(settings: Settings) -> dict[str, object]:
+def session_cookie_options(settings: Settings) -> SessionCookieOptions:
     return {
         "key": settings.session_cookie_name,
         "httponly": True,

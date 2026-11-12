@@ -157,3 +157,11 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 - Добавлен `tests/unit/test_sessions.py`; 3 теста проходят.
 - Проверки: Ruff lint/format, mypy и `git diff --check` проходят.
 - Следующий мини шаг: подключить настройки и session helpers к FastAPI dependency и реализовать `POST /api/v1/browser-session` с PostgreSQL-сохранением.
+
+## Онбординг 3: четвёртый мини шаг, 2026-11-12
+
+- Добавлены DTO, FastAPI dependencies и маршруты `POST /api/v1/browser-session` и `GET /api/v1/context`.
+- Создание сессии проверяет точный Origin, сохраняет `BrowserSession` через SQLAlchemy, выставляет HttpOnly cookie и возвращает CSRF-секрет; повтор использует действующую cookie. Контекст отвечает без кеширования и не раскрывает данные без сессии.
+- API-тесты используют изолированную in-memory dependency для проверки HTTP-контракта; отдельная интеграционная проверка на PostgreSQL остаётся следующим шагом. Локальный доступ к PostgreSQL сейчас недоступен из песочницы.
+- Проверки: 5 API/unit-тестов проходят, Ruff lint/format, mypy и `git diff --check` проходят.
+- Следующий мини шаг: добавить security-тесты для Origin/CSRF, лишних полей и безопасных ошибок, затем подготовить PostgreSQL-интеграционный прогон.
