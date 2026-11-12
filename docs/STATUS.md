@@ -143,3 +143,10 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 - Добавлены первые RED-тесты `tests/api/conftest.py` и `tests/api/test_browser_session.py` для создания/повторного использования гостевой cookie и GET `/api/v1/context` с `Cache-Control: no-store`.
 - Проверки: Ruff lint/format и `git diff --check` прошли. RED-прогон дал 2 ошибки на ожидаемом отсутствии `english_for_developers.app`; реализации API ещё нет. Базовые 191 unit-тест шага 2 проходят во временном окружении.
 - Следующий мини шаг после согласия: добавить зависимости FastAPI/HTTPX/Pydantic в проект и минимальную основу приложения, чтобы RED-тесты падали уже на конкретном отсутствии маршрутов/поведения.
+
+## Онбординг 3: второй мини шаг, 2026-11-12
+
+- В `pyproject.toml` добавлены FastAPI, HTTPX и Pydantic; `uv.lock` обновлён с актуальными разрешёнными версиями.
+- Создан `src/english_for_developers/app.py` с фабрикой `create_app()` и базовым FastAPI-приложением.
+- Проверки: RED-тесты гостевой сессии теперь дают 2 ожидаемых `404` на отсутствующие маршруты; Ruff lint/format, mypy и `git diff --check` проходят.
+- Следующий мини шаг: реализовать защищённую основу API и первый маршрут `POST /api/v1/browser-session` с тестом создания/повтора cookie.
