@@ -26,7 +26,11 @@ def test_browser_session_is_persisted_and_reused(
     headers = {"Origin": "http://testserver"}
 
     first = integration_client.post("/api/v1/browser-session", headers=headers, json={})
-    repeated = integration_client.post("/api/v1/browser-session", headers=headers, json={})
+    repeated = integration_client.post(
+        "/api/v1/browser-session",
+        headers={**headers, "X-CSRF-Token": first.json()["csrf_token"]},
+        json={},
+    )
 
     assert first.status_code == 201
     assert repeated.status_code == 200

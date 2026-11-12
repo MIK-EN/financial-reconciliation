@@ -37,3 +37,4 @@ files = ["src/english_for_developers"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = ["--import-mode=importlib"]

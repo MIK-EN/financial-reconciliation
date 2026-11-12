@@ -15,7 +15,11 @@ def test_browser_session_is_created_and_reused(client: Any) -> None:
     assert first_body["csrf_token"]
     assert first.headers.get_list("set-cookie")
 
-    repeated = client.post("/api/v1/browser-session", headers=headers, json={})
+    repeated = client.post(
+        "/api/v1/browser-session",
+        headers={**headers, "X-CSRF-Token": first_body["csrf_token"]},
+        json={},
+    )
 
     assert repeated.status_code == 200
     assert repeated.json()["csrf_token"] == first_body["csrf_token"]

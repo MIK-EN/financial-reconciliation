@@ -35,6 +35,11 @@ def require_origin(origin: str | None, expected_origin: str) -> None:
         raise ValueError("origin not allowed")
 
 
+def require_csrf_token(token: str | None, expected_token: str) -> None:
+    if token is None or not secrets.compare_digest(token, expected_token):
+        raise ValueError("csrf token not allowed")
+
+
 def session_cookie_options(settings: Settings) -> SessionCookieOptions:
     return {
         "key": settings.session_cookie_name,

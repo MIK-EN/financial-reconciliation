@@ -11,6 +11,7 @@ from english_for_developers.accounts.sessions import (
     hash_session_token,
     issue_csrf_secret,
     issue_session_token,
+    require_csrf_token,
     require_origin,
     session_cookie_options,
 )
@@ -66,6 +67,7 @@ def create_browser_session(
     response: Response,
     request: Request,
     origin: str | None = Header(default=None),
+    csrf_token: str | None = Header(default=None, alias="X-CSRF-Token"),
     db: Session = Depends(get_db),  # noqa: B008
     now: datetime = Depends(get_now),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
@@ -76,9 +78,15 @@ def create_browser_session(
     except ValueError as exc:
         raise HTTPException(status_code=403, detail="origin not allowed") from exc
 
-    session, token, created = _ensure_session(
-        db, settings, request.cookies.get(settings.session_cookie_name), now
-    )
+    existing = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
+    if existing is not None:
+        try:
+            require_csrf_token(csrf_token, existing.csrf_secret)
+        except ValueError as exc:
+            raise HTTPException(status_code=403, detail="csrf token not allowed") from exc
+        session, token, created = existing, "", False
+    else:
+        session, token, created = _ensure_session(db, settings, None, now)
     if created:
         response.set_cookie(value=token, **session_cookie_options(settings))
         response.status_code = 201
