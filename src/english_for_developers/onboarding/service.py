@@ -23,6 +23,10 @@ class InvalidAnswer(ValueError):
     """The answer body does not satisfy the content contract."""
 
 
+class OnboardingNotFound(ValueError):
+    """The requested onboarding resource is not visible to this owner."""
+
+
 @dataclass(frozen=True)
 class ActiveRun:
     id: UUID
@@ -180,11 +184,20 @@ def submit_answer(
         )
         .with_for_update()
     )
-    if run is None or run.expires_at <= now:
+    if run is None:
+        raise OnboardingNotFound("run is unavailable")
+    if run.expires_at <= now:
         raise ValueError("run is unavailable")
-    step = db.get(OnboardingStep, step_id)
+    step = db.scalar(
+        select(OnboardingStep).where(
+            OnboardingStep.id == step_id,
+            OnboardingStep.run_id == run.id,
+        )
+    )
     bundle = db.get(ContentBundle, run.content_version)
-    if step is None or bundle is None:
+    if step is None:
+        raise OnboardingNotFound("step is unavailable")
+    if bundle is None:
         raise ValueError("run state is unavailable")
     if run.content_version != content_version:
         raise ValueError("stale run state")

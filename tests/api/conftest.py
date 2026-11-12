@@ -42,6 +42,16 @@ class FakeSession:
             return self.browser_session
         if model is OnboardingRun:
             return self.run
+        if model is OnboardingStep:
+            values = set(statement.compile().params.values())
+            return next(
+                (
+                    step
+                    for step in self.steps.values()
+                    if step.id in values and step.run_id in values
+                ),
+                None,
+            )
         raise AssertionError(f"Unexpected scalar model: {model}")
 
     def get(self, model, key):

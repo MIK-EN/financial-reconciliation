@@ -31,6 +31,7 @@ from english_for_developers.onboarding.service import (
     ActiveRun,
     CompletedRun,
     InvalidAnswer,
+    OnboardingNotFound,
     read_run,
     select_level,
     start_run,
@@ -211,6 +212,8 @@ def create_answer(
             body.content_version,
             now,
         )
+    except OnboardingNotFound as exc:
+        raise HTTPException(status_code=404, detail="onboarding resource not found") from exc
     except InvalidAnswer as exc:
         raise HTTPException(status_code=422, detail="invalid answer") from exc
     except ValueError as exc:
