@@ -300,3 +300,9 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 
 - Без изменения SQL и поведения отформатировано выражение миграции `0002_fix_unanswered_step_constraint.py`, которое оставалось единственной причиной падения общего Ruff format-check.
 - Проверки: Ruff lint успешен; `ruff format --check .` — 51 file already formatted; mypy успешен; Alembic показывает `0002_unanswered_step (head)` и отсутствие новых операций; полный `pytest tests -q` с disposable PostgreSQL — 233 passed.
+
+## Онбординг 4: дубликаты ID и версия ответа, 2026-11-12
+
+- Добавлены API-проверки двух отказов без изменения run: повторяющийся `word_id` возвращает 422, несовпадающий `content_version` — 409; revision и текущий step остаются прежними.
+- Оба правила уже были реализованы. Отдельные mutation-проверки подтвердили чувствительность тестов: без каждого правила соответствующий запрос ошибочно получал 200. Продакшен-код восстановлен без изменений.
+- Проверки: Ruff lint и format-check успешны, mypy успешен; полный `pytest tests -q` с disposable PostgreSQL — 235 passed.

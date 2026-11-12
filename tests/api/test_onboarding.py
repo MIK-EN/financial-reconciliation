@@ -1,5 +1,7 @@
 from typing import Any
 
+import pytest
+
 
 def test_start_creates_active_run_for_browser_session(client: Any) -> None:
     created_session = client.post(
@@ -297,3 +299,40 @@ def test_unknown_word_id_is_rejected_without_changing_run(client: Any) -> None:
     assert response.status_code == 422
     assert state.json()["revision"] == 0
     assert state.json()["step"]["text_id"] == "start"
+
+
+@pytest.mark.parametrize(
+    ("answer_override", "expected_status"),
+    [
+        pytest.param({"word_ids": ["w1", "w1"]}, 422, id="duplicate-word-ids"),
+        pytest.param({"content_version": "stale-version"}, 409, id="content-version-mismatch"),
+    ],
+)
+def test_invalid_answer_does_not_change_run(
+    client: Any, answer_override: dict[str, object], expected_status: int
+) -> None:
+    headers = {"Origin": "http://testserver"}
+    session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
+    started = client.post(
+        "/api/v1/onboarding",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={},
+    ).json()
+    answer = {
+        "step_id": started["step"]["id"],
+        "mode": "unknown_words",
+        "word_ids": ["w1"],
+        "content_version": started["bundle_version"],
+        **answer_override,
+    }
+
+    response = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json=answer,
+    )
+    state = client.get(f"/api/v1/onboarding/{started['id']}")
+
+    assert response.status_code == expected_status
+    assert state.json()["revision"] == 0
+    assert state.json()["step"] == started["step"]
