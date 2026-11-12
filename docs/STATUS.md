@@ -269,3 +269,7 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 ## Онбординг 4: чтение завершённого run, 2026-11-12
 
 - GET своего run теперь возвращает completed state с сохранённой рекомендацией вместо 404. RED был 404; после реализации unit/API-набор — 209 passed, Ruff, форматирование и mypy успешны.
+
+## Онбординг 4: проверка PostgreSQL-среды, 2026-11-12
+
+- Local PostgreSQL 17 healthy; миграция применена только к disposable `english_for_developers_test`. Существующий integration suite прошёл: 19 passed. Новые сценарии гонок задачи 4 ещё не добавлены.
