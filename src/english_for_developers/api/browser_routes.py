@@ -19,12 +19,13 @@ from english_for_developers.api.dependencies import get_db, get_now, get_setting
 from english_for_developers.api.schemas import (
     ActiveRunResponse,
     ActiveStepResponse,
+    AnswerRequest,
     BrowserContextResponse,
     BrowserSessionResponse,
     EmptyBody,
     SegmentResponse,
 )
-from english_for_developers.onboarding.service import ActiveRun, read_run, start_run
+from english_for_developers.onboarding.service import ActiveRun, read_run, start_run, submit_answer
 from english_for_developers.settings import Settings
 from english_for_developers.storage.models import BrowserSession
 
@@ -166,6 +167,40 @@ def get_onboarding_run(
         run = read_run(db, session, run_id, now)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail="onboarding run not found") from exc
+    response.headers["Cache-Control"] = "no-store"
+    return _active_run_response(run)
+
+
+@router.post("/onboarding/{run_id}/answers", response_model=ActiveRunResponse)
+def create_answer(
+    run_id: UUID,
+    body: AnswerRequest,
+    response: Response,
+    request: Request,
+    origin: str | None = Header(default=None),
+    csrf_token: str | None = Header(default=None, alias="X-CSRF-Token"),
+    db: Session = Depends(get_db),  # noqa: B008
+    now: datetime = Depends(get_now),  # noqa: B008
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> ActiveRunResponse:
+    try:
+        require_origin(origin, settings.expected_origin)
+        session = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
+        if session is None:
+            raise ValueError("anonymous session is unavailable")
+        require_csrf_token(csrf_token, session.csrf_secret)
+        run = submit_answer(
+            db,
+            session,
+            run_id,
+            body.step_id,
+            body.mode,
+            body.word_ids,
+            body.content_version,
+            now,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="answer cannot be accepted") from exc
     response.headers["Cache-Control"] = "no-store"
     return _active_run_response(run)
 

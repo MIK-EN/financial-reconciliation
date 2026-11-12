@@ -48,3 +48,32 @@ def test_owner_reads_active_run_after_start(client: Any) -> None:
     assert response.json()["id"] == started.json()["id"]
     assert response.json()["status"] == "active"
     assert response.json()["step"]["text_id"] == "start"
+
+
+def test_answer_moves_run_to_next_text(client: Any) -> None:
+    headers = {"Origin": "http://testserver"}
+    created_session = client.post("/api/v1/browser-session", headers=headers, json={})
+    csrf_token = created_session.json()["csrf_token"]
+    started = client.post(
+        "/api/v1/onboarding",
+        headers={**headers, "X-CSRF-Token": csrf_token},
+        json={},
+    )
+    initial = started.json()
+
+    response = client.post(
+        f"/api/v1/onboarding/{initial['id']}/answers",
+        headers={**headers, "X-CSRF-Token": csrf_token},
+        json={
+            "step_id": initial["step"]["id"],
+            "mode": "all_known",
+            "word_ids": [],
+            "content_version": initial["bundle_version"],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["revision"] == 1
+    assert response.json()["step"]["ordinal"] == 2
+    assert response.json()["step"]["text_id"] == "installation"

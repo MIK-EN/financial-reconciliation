@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from english_for_developers.content.schema import DisplaySegment
 from english_for_developers.content.validation import validate_bundle
+from english_for_developers.onboarding.rules import evaluate_answer, next_transition
 from english_for_developers.storage.models import (
     BrowserSession,
     ContentBundle,
@@ -129,6 +130,76 @@ def read_run(
     if step is None:
         raise ValueError("active run has no current step")
     return _active_run(db, run, step, created=False)
+
+
+def submit_answer(
+    db: Session,
+    browser_session: BrowserSession,
+    run_id: UUID,
+    step_id: UUID,
+    mode: str,
+    word_ids: list[str],
+    content_version: str,
+    now: datetime,
+) -> ActiveRun:
+    """Persist one answer and create the next active step."""
+    run = db.scalar(
+        select(OnboardingRun)
+        .where(
+            OnboardingRun.id == run_id,
+            OnboardingRun.anonymous_session_id == browser_session.id,
+        )
+        .with_for_update()
+    )
+    if run is None or run.status != "active" or run.expires_at <= now:
+        raise ValueError("run is unavailable")
+    if run.content_version != content_version or run.current_step_id != step_id:
+        raise ValueError("stale run state")
+    step = db.get(OnboardingStep, step_id)
+    bundle = db.get(ContentBundle, run.content_version)
+    if step is None or bundle is None:
+        raise ValueError("run state is unavailable")
+    text = validate_bundle(bundle.content_json).get_text(step.text_id)
+    evaluation = evaluate_answer(text, mode, word_ids, run.threshold_percent)  # type: ignore[arg-type]
+    transition = next_transition(text.id, evaluation.accessible)
+    if transition.next_text_id is None:
+        raise ValueError("completed runs are not implemented")
+
+    next_text = validate_bundle(bundle.content_json).get_text(transition.next_text_id)
+    next_step = OnboardingStep(
+        id=uuid4(),
+        run_id=run.id,
+        ordinal=step.ordinal + 1,
+        text_id=next_text.id,
+        answer_mode=None,
+        unknown_word_ids=None,
+        unknown_count=None,
+        total_word_count=None,
+        accessible=None,
+        created_at=now,
+        answered_at=None,
+    )
+    step.answer_mode = evaluation.mode
+    step.unknown_word_ids = list(evaluation.word_ids)
+    step.unknown_count = evaluation.unknown_count
+    step.total_word_count = evaluation.total_count
+    step.accessible = evaluation.accessible
+    step.answered_at = now
+    run.current_step_id = next_step.id
+    run.revision += 1
+    db.add(next_step)
+    db.commit()
+    return ActiveRun(
+        id=run.id,
+        revision=run.revision,
+        bundle_version=run.content_version,
+        expires_at=run.expires_at,
+        step_id=next_step.id,
+        ordinal=next_step.ordinal,
+        text_id=next_step.text_id,
+        segments=next_text.segments,
+        created=False,
+    )
 
 
 def _active_run(

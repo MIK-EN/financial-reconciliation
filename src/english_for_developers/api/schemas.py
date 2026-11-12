@@ -1,6 +1,7 @@
 """Public DTOs for the browser session API."""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -42,3 +43,12 @@ class ActiveRunResponse(BaseModel):
     bundle_version: str
     expires_at: datetime
     step: ActiveStepResponse
+
+
+class AnswerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
+
+    step_id: UUID
+    mode: Literal["all_known", "unknown_words"]
+    word_ids: list[str]
+    content_version: str
