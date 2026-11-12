@@ -1,7 +1,7 @@
 """Guest browser session endpoints."""
 
 from datetime import datetime, timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from sqlalchemy import select
@@ -24,7 +24,7 @@ from english_for_developers.api.schemas import (
     EmptyBody,
     SegmentResponse,
 )
-from english_for_developers.onboarding.service import ActiveRun, start_run
+from english_for_developers.onboarding.service import ActiveRun, read_run, start_run
 from english_for_developers.settings import Settings
 from english_for_developers.storage.models import BrowserSession
 
@@ -146,6 +146,26 @@ def create_onboarding_run(
         raise HTTPException(status_code=403, detail="onboarding access not allowed") from exc
 
     response.status_code = 201 if run.created else 200
+    response.headers["Cache-Control"] = "no-store"
+    return _active_run_response(run)
+
+
+@router.get("/onboarding/{run_id}", response_model=ActiveRunResponse)
+def get_onboarding_run(
+    run_id: UUID,
+    response: Response,
+    request: Request,
+    db: Session = Depends(get_db),  # noqa: B008
+    now: datetime = Depends(get_now),  # noqa: B008
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> ActiveRunResponse:
+    session = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
+    if session is None:
+        raise HTTPException(status_code=404, detail="onboarding run not found")
+    try:
+        run = read_run(db, session, run_id, now)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="onboarding run not found") from exc
     response.headers["Cache-Control"] = "no-store"
     return _active_run_response(run)
 

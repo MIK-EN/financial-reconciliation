@@ -111,6 +111,26 @@ def start_run(db: Session, browser_session: BrowserSession, now: datetime) -> Ac
     )
 
 
+def read_run(
+    db: Session, browser_session: BrowserSession, run_id: UUID, now: datetime
+) -> ActiveRun:
+    """Return an active run only to its current anonymous-session owner."""
+    if browser_session.revoked_at is not None or browser_session.expires_at <= now:
+        raise ValueError("anonymous session is unavailable")
+    run = db.scalar(
+        select(OnboardingRun).where(
+            OnboardingRun.id == run_id,
+            OnboardingRun.anonymous_session_id == browser_session.id,
+        )
+    )
+    if run is None or run.status != "active":
+        raise ValueError("run is unavailable")
+    step = db.get(OnboardingStep, run.current_step_id)
+    if step is None:
+        raise ValueError("active run has no current step")
+    return _active_run(db, run, step, created=False)
+
+
 def _active_run(
     db: Session, run: OnboardingRun, step: OnboardingStep, *, created: bool
 ) -> ActiveRun:
