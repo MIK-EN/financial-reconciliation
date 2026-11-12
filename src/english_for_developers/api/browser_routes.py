@@ -17,10 +17,14 @@ from english_for_developers.accounts.sessions import (
 )
 from english_for_developers.api.dependencies import get_db, get_now, get_settings
 from english_for_developers.api.schemas import (
+    ActiveRunResponse,
+    ActiveStepResponse,
     BrowserContextResponse,
     BrowserSessionResponse,
     EmptyBody,
+    SegmentResponse,
 )
+from english_for_developers.onboarding.service import ActiveRun, start_run
 from english_for_developers.settings import Settings
 from english_for_developers.storage.models import BrowserSession
 
@@ -116,4 +120,49 @@ def get_context(
     return BrowserContextResponse(
         anonymous_session_id=session.id,
         csrf_token=session.csrf_secret,
+    )
+
+
+@router.post("/onboarding", response_model=ActiveRunResponse, status_code=200)
+def create_onboarding_run(
+    body: EmptyBody,
+    response: Response,
+    request: Request,
+    origin: str | None = Header(default=None),
+    csrf_token: str | None = Header(default=None, alias="X-CSRF-Token"),
+    db: Session = Depends(get_db),  # noqa: B008
+    now: datetime = Depends(get_now),  # noqa: B008
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> ActiveRunResponse:
+    del body
+    try:
+        require_origin(origin, settings.expected_origin)
+        session = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
+        if session is None:
+            raise ValueError("anonymous session is unavailable")
+        require_csrf_token(csrf_token, session.csrf_secret)
+        run = start_run(db, session, now)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="onboarding access not allowed") from exc
+
+    response.status_code = 201 if run.created else 200
+    response.headers["Cache-Control"] = "no-store"
+    return _active_run_response(run)
+
+
+def _active_run_response(run: ActiveRun) -> ActiveRunResponse:
+    return ActiveRunResponse(
+        id=run.id,
+        revision=run.revision,
+        bundle_version=run.bundle_version,
+        expires_at=run.expires_at,
+        step=ActiveStepResponse(
+            id=run.step_id,
+            ordinal=run.ordinal,
+            text_id=run.text_id,
+            segments=[
+                SegmentResponse(text=segment.text, word_id=segment.word_id)
+                for segment in run.segments
+            ],
+        ),
     )

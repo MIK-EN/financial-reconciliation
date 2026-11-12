@@ -21,3 +21,24 @@ class BrowserContextResponse(BaseModel):
     anonymous_session_id: UUID | None = None
     csrf_token: str | None = None
     saved_run_ids: list[UUID] = []
+
+
+class SegmentResponse(BaseModel):
+    text: str
+    word_id: str | None
+
+
+class ActiveStepResponse(BaseModel):
+    id: UUID
+    ordinal: int
+    text_id: str
+    segments: list[SegmentResponse]
+
+
+class ActiveRunResponse(BaseModel):
+    id: UUID
+    status: str = "active"
+    revision: int
+    bundle_version: str
+    expires_at: datetime
+    step: ActiveStepResponse
