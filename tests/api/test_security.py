@@ -25,3 +25,19 @@ def test_extra_fields_are_rejected_without_echoing_secret_input(client: Any) -> 
 
     assert response.status_code == 422
     assert "do-not-echo" not in response.text
+
+
+def test_json_body_limit_does_not_trust_content_length(client: Any) -> None:
+    oversized = b'{"padding":"' + (b"x" * (16 * 1024)) + b'"}'
+    response = client.post(
+        "/api/v1/browser-session",
+        headers={
+            "Origin": "http://testserver",
+            "Content-Type": "application/json",
+            "Content-Length": "0",
+        },
+        content=oversized,
+    )
+
+    assert response.status_code == 413
+    assert response.json() == {"detail": "request body too large"}
