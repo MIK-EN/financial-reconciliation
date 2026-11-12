@@ -32,6 +32,17 @@ class ActiveRun:
     created: bool
 
 
+@dataclass(frozen=True)
+class CompletedRun:
+    id: UUID
+    revision: int
+    bundle_version: str
+    expires_at: datetime
+    recommended_level: str
+    selected_level: str
+    reason_code: str
+
+
 def start_run(db: Session, browser_session: BrowserSession, now: datetime) -> ActiveRun:
     """Create an anonymous run once, or return its current active step."""
     locked_session = db.scalar(
@@ -141,7 +152,7 @@ def submit_answer(
     word_ids: list[str],
     content_version: str,
     now: datetime,
-) -> ActiveRun:
+) -> ActiveRun | CompletedRun:
     """Persist one answer and create the next active step."""
     run = db.scalar(
         select(OnboardingRun)
@@ -174,7 +185,31 @@ def submit_answer(
         raise ValueError("stale run state")
     transition = next_transition(text.id, evaluation.accessible)
     if transition.next_text_id is None:
-        raise ValueError("completed runs are not implemented")
+        if transition.level is None or transition.reason_code is None:
+            raise ValueError("invalid terminal transition")
+        step.answer_mode = evaluation.mode
+        step.unknown_word_ids = list(evaluation.word_ids)
+        step.unknown_count = evaluation.unknown_count
+        step.total_word_count = evaluation.total_count
+        step.accessible = evaluation.accessible
+        step.answered_at = now
+        run.current_step_id = None
+        run.status = "completed"
+        run.recommended_level = transition.level
+        run.selected_level = transition.level
+        run.reason_code = transition.reason_code
+        run.completed_at = now
+        run.revision += 1
+        db.commit()
+        return CompletedRun(
+            id=run.id,
+            revision=run.revision,
+            bundle_version=run.content_version,
+            expires_at=run.expires_at,
+            recommended_level=transition.level,
+            selected_level=transition.level,
+            reason_code=transition.reason_code,
+        )
 
     next_text = validate_bundle(bundle.content_json).get_text(transition.next_text_id)
     next_step = OnboardingStep(

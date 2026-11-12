@@ -45,6 +45,17 @@ class ActiveRunResponse(BaseModel):
     step: ActiveStepResponse
 
 
+class CompletedRunResponse(BaseModel):
+    id: UUID
+    status: Literal["completed"] = "completed"
+    revision: int
+    bundle_version: str
+    expires_at: datetime
+    recommended_level: str
+    selected_level: str
+    reason_code: str
+
+
 class AnswerRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
 

@@ -22,10 +22,17 @@ from english_for_developers.api.schemas import (
     AnswerRequest,
     BrowserContextResponse,
     BrowserSessionResponse,
+    CompletedRunResponse,
     EmptyBody,
     SegmentResponse,
 )
-from english_for_developers.onboarding.service import ActiveRun, read_run, start_run, submit_answer
+from english_for_developers.onboarding.service import (
+    ActiveRun,
+    CompletedRun,
+    read_run,
+    start_run,
+    submit_answer,
+)
 from english_for_developers.settings import Settings
 from english_for_developers.storage.models import BrowserSession
 
@@ -171,7 +178,9 @@ def get_onboarding_run(
     return _active_run_response(run)
 
 
-@router.post("/onboarding/{run_id}/answers", response_model=ActiveRunResponse)
+@router.post(
+    "/onboarding/{run_id}/answers", response_model=ActiveRunResponse | CompletedRunResponse
+)
 def create_answer(
     run_id: UUID,
     body: AnswerRequest,
@@ -182,7 +191,7 @@ def create_answer(
     db: Session = Depends(get_db),  # noqa: B008
     now: datetime = Depends(get_now),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
-) -> ActiveRunResponse:
+) -> ActiveRunResponse | CompletedRunResponse:
     try:
         require_origin(origin, settings.expected_origin)
         session = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
@@ -202,7 +211,7 @@ def create_answer(
     except ValueError as exc:
         raise HTTPException(status_code=409, detail="answer cannot be accepted") from exc
     response.headers["Cache-Control"] = "no-store"
-    return _active_run_response(run)
+    return _run_response(run)
 
 
 def _active_run_response(run: ActiveRun) -> ActiveRunResponse:
@@ -221,3 +230,17 @@ def _active_run_response(run: ActiveRun) -> ActiveRunResponse:
             ],
         ),
     )
+
+
+def _run_response(run: ActiveRun | CompletedRun) -> ActiveRunResponse | CompletedRunResponse:
+    if isinstance(run, CompletedRun):
+        return CompletedRunResponse(
+            id=run.id,
+            revision=run.revision,
+            bundle_version=run.bundle_version,
+            expires_at=run.expires_at,
+            recommended_level=run.recommended_level,
+            selected_level=run.selected_level,
+            reason_code=run.reason_code,
+        )
+    return _active_run_response(run)
