@@ -190,7 +190,7 @@ class OnboardingStep(Base):
     ordinal: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     text_id: Mapped[str] = mapped_column(String(32), nullable=False)
     answer_mode: Mapped[str | None] = mapped_column(String(16))
-    unknown_word_ids: Mapped[list[str] | None] = mapped_column(JSONB)
+    unknown_word_ids: Mapped[list[str] | None] = mapped_column(JSONB(none_as_null=True))
     unknown_count: Mapped[int | None] = mapped_column(SmallInteger)
     total_word_count: Mapped[int | None] = mapped_column(SmallInteger)
     accessible: Mapped[bool | None] = mapped_column()
