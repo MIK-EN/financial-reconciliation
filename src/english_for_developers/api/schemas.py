@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class EmptyBody(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
 
 
 class BrowserSessionResponse(BaseModel):
