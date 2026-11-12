@@ -4,7 +4,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from reconciliation.content.validation import validate_bundle
+from english_for_developers.content.validation import validate_bundle
 
 EXPECTED = {
     "simplified": ("Open the file. Read the text. Save your changes.", 8, 9),
@@ -51,6 +51,9 @@ def test_exact_v1_texts_and_word_counts(bundle):
 
 def test_canonical_hash_and_immutable_snapshot(raw_bundle):
     bundle = validate_bundle(raw_bundle)
+    assert bundle.canonical_json == json.dumps(
+        raw_bundle, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
+    )
     reordered = json.loads(json.dumps(raw_bundle, sort_keys=True, indent=4))
     assert validate_bundle(reordered).content_hash == bundle.content_hash
     assert len(bundle.content_hash) == 64

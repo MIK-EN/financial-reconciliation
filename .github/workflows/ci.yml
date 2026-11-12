@@ -16,6 +16,23 @@ jobs:
     name: Python 3.13 quality
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/english_for_developers_test
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/english_for_developers_test
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: english_for_developers_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d english_for_developers_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -40,7 +57,16 @@ jobs:
         run: uv run --locked ruff format --check .
 
       - name: Check types
-        run: uv run --locked mypy src/reconciliation
+        run: uv run --locked mypy src/english_for_developers
+
+      - name: Apply database migrations
+        run: uv run --locked alembic upgrade head
+
+      - name: Check database schema
+        run: uv run --locked alembic check
+
+      - name: Integration tests
+        run: uv run --locked pytest tests/integration -q
 
       - name: Unit tests
         run: uv run --locked pytest tests/unit -q

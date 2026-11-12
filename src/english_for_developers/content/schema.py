@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from reconciliation.onboarding.types import Level, Route, TextId
+from english_for_developers.onboarding.types import Level, Route, TextId
 
 
 @dataclass(frozen=True)
@@ -43,6 +43,7 @@ class ContentBundle:
     normalization_version: str
     policy_version: str
     content_hash: str
+    canonical_json: str
     texts: tuple[TextDefinition, ...]
     routes: tuple[Route, ...]
     recommendations: tuple[Recommendation, ...]

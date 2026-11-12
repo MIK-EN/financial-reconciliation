@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from reconciliation.content.validation import validate_bundle
+from english_for_developers.content.validation import validate_bundle
 
 CONTENT_PATH = Path(__file__).resolve().parents[2] / "content" / "onboarding-v1.json"
 

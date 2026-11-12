@@ -2,7 +2,7 @@
 
 Портфолио-проект Python backend: сайт с короткими интерактивными уроками английского для разработчиков A2–B1. Первый реализуемый сценарий — подбор стартовой сложности по отмеченным незнакомым словам, без обязательной регистрации.
 
-Сейчас реализован первый шаг: чистые правила онбординга и проверяемый пакет из пяти текстов. Работают нормализация, подсчёт уникальных слов, проверка ответов и шесть маршрутов к четырём рекомендациям. Базы данных, API, аккаунтов и веб-интерфейса пока нет. Уроки относятся к следующему продуктовому этапу.
+Реализованы чистые правила онбординга и пакет из пяти текстов. Добавлены PostgreSQL-схема, миграции и неизменяемая публикация пакета; интеграционные проверки выполняются на отдельной БД через Docker/PostgreSQL. API, аккаунтов и веб-интерфейса пока нет. Уроки относятся к следующему продуктовому этапу.
 
 ## Окружение
 
@@ -15,18 +15,53 @@ uv sync --locked
 uv run --locked python --version
 ```
 
-uv создаёт `.venv` и устанавливает зависимости из `uv.lock`. Для правил онбординга дополнительных зависимостей не потребовалось. Пакет пока называется `reconciliation`, репозиторий сохраняет прежнее имя; переименование — отдельный шаг.
+uv создаёт `.venv` и устанавливает зависимости из `uv.lock`. Пакет приложения называется `english_for_developers`; имя публичного GitHub-репозитория сохраняется отдельно.
 
 ## Проверки
 
 ```bash
 uv run --locked ruff check .
 uv run --locked ruff format --check .
-uv run --locked mypy src/reconciliation
+uv run --locked mypy src/english_for_developers
 uv run --locked pytest tests/unit -q
 ```
 
 Тесты проверяют исходные тексты, 104 возможных количества неизвестных слов, все шесть маршрутов, границы порога, неверные ответы, разметку и целостность контента. Для локального форматирования: `uv run --locked ruff format .`. CI проверяет код без автоматического исправления.
+
+## PostgreSQL, миграции и публикация контента
+
+Для локальной базы нужны Docker Engine и Compose v2. PostgreSQL 17 закреплён одинаково в Compose и CI. Создайте локальный `.env` из примера и запустите базу:
+
+```bash
+cp .env.example .env
+docker compose up -d postgres
+set -a; . ./.env; set +a
+```
+
+`compose.yaml` публикует порт только на `127.0.0.1`, сохраняет данные в именованном томе и создаёт отдельную БД с суффиксом `_test`. Пароль из `.env.example` предназначен только для локальной разработки; замените его в своём `.env`.
+
+Применить миграции и проверить их соответствие моделям:
+
+```bash
+uv run --locked alembic upgrade head
+uv run --locked alembic check
+```
+
+Пакет можно проверить без подключения к БД, затем сохранить и активировать для новых прохождений:
+
+```bash
+uv run --locked python -m english_for_developers.cli content validate content/onboarding-v1.json
+uv run --locked python -m english_for_developers.cli content import content/onboarding-v1.json --activate --threshold-percent 20
+```
+
+Импорт той же версии и SHA-256 безопасен; изменить опубликованную версию нельзя. Новая версия и порог применяются только к новым прохождениям. Интеграционные тесты используют только `TEST_DATABASE_URL`, требующий имя БД с суффиксом `_test`:
+
+```bash
+export DATABASE_URL="$TEST_DATABASE_URL"
+uv run --locked alembic upgrade head
+uv run --locked alembic check
+uv run --locked pytest tests/integration -q
+```
 
 ## Демонстрация правил
 
@@ -37,8 +72,8 @@ uv run --locked python - <<'PY'
 import json
 from pathlib import Path
 
-from reconciliation.content.validation import validate_bundle
-from reconciliation.onboarding.rules import evaluate_answer, next_transition
+from english_for_developers.content.validation import validate_bundle
+from english_for_developers.onboarding.rules import evaluate_answer, next_transition
 
 bundle = validate_bundle(json.loads(Path('content/onboarding-v1.json').read_text()))
 text_id = 'start'
@@ -64,9 +99,9 @@ PY
 
 ## CI и дальнейшие шаги
 
-GitHub Actions на push и pull request восстанавливает locked-окружение, запускает Ruff, форматирование, mypy и unit-тесты под Python 3.13 на Linux. Ветка `feat/onboarding-rules` опубликована: [CI для первого шага прошёл успешно](https://github.com/MIK-EN/financial-reconciliation/actions/runs/42982220945) на коммите `1bbad06`. Main пока не обновлён. Коммиты и push выполняются только по запросу пользователя.
+GitHub Actions на push и pull request восстанавливает locked-окружение, запускает Ruff, форматирование, mypy, unit- и PostgreSQL integration-тесты под Python 3.13 на Linux. Ветка `feat/onboarding-rules` опубликована: [CI для первого шага прошёл успешно](https://github.com/MIK-EN/financial-reconciliation/actions/runs/42982220945) на коммите `1bbad06`. Этот результат относится только к первому шагу, не к новому коду хранения. Main пока не обновлён. Коммиты и push выполняются только по запросу пользователя.
 
-Следующий шаг плана — PostgreSQL, миграции и неизменяемый импорт пакета. Развёртывание пока не настроено.
+Следующий шаг плана — гостевая сессия и защищённая основа API. Локальные проверки шага хранения и [GitHub Actions](https://github.com/MIK-EN/financial-reconciliation/actions/runs/43003269973) прошли. Развёртывание пока не настроено.
 
 ## Документация
 
