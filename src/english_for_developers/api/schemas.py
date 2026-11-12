@@ -56,6 +56,13 @@ class CompletedRunResponse(BaseModel):
     reason_code: str
 
 
+class SelectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
+
+    selected_level: Literal["foundations", "basic_docs", "confident_reading", "complex_texts"]
+    expected_revision: int
+
+
 class AnswerRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
 

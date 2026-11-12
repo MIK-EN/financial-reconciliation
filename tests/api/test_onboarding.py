@@ -148,3 +148,43 @@ def test_last_answer_completes_run_with_recommendation(client: Any) -> None:
     assert response.json()["recommended_level"] == "foundations"
     assert response.json()["selected_level"] == "foundations"
     assert response.json()["reason_code"] == "simplified_accessible"
+
+
+def test_completed_run_allows_level_selection(client: Any) -> None:
+    headers = {"Origin": "http://testserver"}
+    session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
+    started = client.post(
+        "/api/v1/onboarding",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={},
+    ).json()
+    simplified = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={
+            "step_id": started["step"]["id"],
+            "mode": "unknown_words",
+            "word_ids": ["w1", "w2", "w3"],
+            "content_version": started["bundle_version"],
+        },
+    ).json()
+    completed = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={
+            "step_id": simplified["step"]["id"],
+            "mode": "all_known",
+            "word_ids": [],
+            "content_version": started["bundle_version"],
+        },
+    ).json()
+
+    response = client.put(
+        f"/api/v1/onboarding/{started['id']}/selection",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={"selected_level": "basic_docs", "expected_revision": completed["revision"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["selected_level"] == "basic_docs"
+    assert response.json()["revision"] == 3

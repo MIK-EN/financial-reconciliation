@@ -248,6 +248,45 @@ def submit_answer(
     )
 
 
+def select_level(
+    db: Session,
+    browser_session: BrowserSession,
+    run_id: UUID,
+    selected_level: str,
+    expected_revision: int,
+    now: datetime,
+) -> CompletedRun:
+    """Change a completed run's user-selected level once per revision."""
+    run = db.scalar(
+        select(OnboardingRun)
+        .where(
+            OnboardingRun.id == run_id,
+            OnboardingRun.anonymous_session_id == browser_session.id,
+        )
+        .with_for_update()
+    )
+    if run is None or run.status != "completed" or run.expires_at <= now:
+        raise ValueError("run is unavailable")
+    if run.revision != expected_revision:
+        if run.selected_level != selected_level:
+            raise ValueError("stale revision")
+    elif run.selected_level != selected_level:
+        run.selected_level = selected_level
+        run.revision += 1
+        db.commit()
+    if run.recommended_level is None or run.selected_level is None or run.reason_code is None:
+        raise ValueError("completed run is invalid")
+    return CompletedRun(
+        id=run.id,
+        revision=run.revision,
+        bundle_version=run.content_version,
+        expires_at=run.expires_at,
+        recommended_level=run.recommended_level,
+        selected_level=run.selected_level,
+        reason_code=run.reason_code,
+    )
+
+
 def _active_run(
     db: Session, run: OnboardingRun, step: OnboardingStep, *, created: bool
 ) -> ActiveRun:

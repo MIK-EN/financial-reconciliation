@@ -25,11 +25,13 @@ from english_for_developers.api.schemas import (
     CompletedRunResponse,
     EmptyBody,
     SegmentResponse,
+    SelectionRequest,
 )
 from english_for_developers.onboarding.service import (
     ActiveRun,
     CompletedRun,
     read_run,
+    select_level,
     start_run,
     submit_answer,
 )
@@ -214,6 +216,29 @@ def create_answer(
     return _run_response(run)
 
 
+@router.put("/onboarding/{run_id}/selection", response_model=CompletedRunResponse)
+def update_selection(
+    run_id: UUID,
+    body: SelectionRequest,
+    request: Request,
+    origin: str | None = Header(default=None),
+    csrf_token: str | None = Header(default=None, alias="X-CSRF-Token"),
+    db: Session = Depends(get_db),  # noqa: B008
+    now: datetime = Depends(get_now),  # noqa: B008
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> CompletedRunResponse:
+    try:
+        require_origin(origin, settings.expected_origin)
+        session = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
+        if session is None:
+            raise ValueError("anonymous session is unavailable")
+        require_csrf_token(csrf_token, session.csrf_secret)
+        run = select_level(db, session, run_id, body.selected_level, body.expected_revision, now)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="selection cannot be accepted") from exc
+    return _completed_run_response(run)
+
+
 def _active_run_response(run: ActiveRun) -> ActiveRunResponse:
     return ActiveRunResponse(
         id=run.id,
@@ -234,13 +259,17 @@ def _active_run_response(run: ActiveRun) -> ActiveRunResponse:
 
 def _run_response(run: ActiveRun | CompletedRun) -> ActiveRunResponse | CompletedRunResponse:
     if isinstance(run, CompletedRun):
-        return CompletedRunResponse(
-            id=run.id,
-            revision=run.revision,
-            bundle_version=run.bundle_version,
-            expires_at=run.expires_at,
-            recommended_level=run.recommended_level,
-            selected_level=run.selected_level,
-            reason_code=run.reason_code,
-        )
+        return _completed_run_response(run)
     return _active_run_response(run)
+
+
+def _completed_run_response(run: CompletedRun) -> CompletedRunResponse:
+    return CompletedRunResponse(
+        id=run.id,
+        revision=run.revision,
+        bundle_version=run.bundle_version,
+        expires_at=run.expires_at,
+        recommended_level=run.recommended_level,
+        selected_level=run.selected_level,
+        reason_code=run.reason_code,
+    )

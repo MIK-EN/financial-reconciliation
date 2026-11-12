@@ -256,3 +256,8 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 
 - Последний ответ теперь в одной транзакции завершает run, очищает current step и возвращает неизменяемую рекомендацию вместе с первоначальным selected level и reason code.
 - RED: терминальный ответ давал 409. После реализации API-контракт проходит; `pytest tests/unit tests/api -q` — 207 passed, Ruff, форматирование и mypy успешны.
+
+## Онбординг 4: выбор уровня, 2026-11-12
+
+- Реализован `PUT /api/v1/onboarding/{run_id}/selection`: владелец completed run может изменить selected level при совпадающей revision; успешное изменение увеличивает revision.
+- RED был 404 до маршрута; после реализации `pytest tests/unit tests/api -q` — 208 passed, Ruff, форматирование и mypy успешны.
