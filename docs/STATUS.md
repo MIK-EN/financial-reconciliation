@@ -135,3 +135,87 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 - На PostgreSQL 17.11 применена миграция; `alembic check` сообщил `No new upgrade operations detected`; 17 integration и 208 общих тестов прошли. Ruff lint/format, mypy, Compose config и `git diff --check` прошли. Удалённый CI для feature branch отдельно не проверялся.
 - Исправлены две обнаруженные тестами проблемы: schema test исключает служебную `alembic_version` из шести таблиц приложения; интеграционный CLI-тест явно направляет команду через `TEST_DATABASE_URL`. Disposable `_test` база очищается между тестами, включая внешне зафиксированную транзакцию CLI.
 - По просьбе пользователя изменения разбиты на восемь порционных коммитов в `feat/onboarding-storage`: `1c252d0`, `759768a`, `c420a73`, `833c83c`, `a64e221`, `9d80cb0`, `9ac51a4`, `9ab7159`. [Ветка](https://github.com/MIK-EN/financial-reconciliation/tree/feat/onboarding-storage) отправлена в origin; [PR #3](https://github.com/MIK-EN/financial-reconciliation/pull/3) открыт. После merge PR #2 возник конфликт в этом файле статуса; он разрешён merge-коммитом `ef67fd7`, сохранившим локальные копии архивных файлов и историю обеих веток. Все 208 тестов, Ruff, mypy и `alembic check` повторно прошли после объединения. [GitHub Actions run для обновлённого PR прошёл](https://github.com/MIK-EN/financial-reconciliation/actions/runs/43003269973). Дополнительно создан `2f1c329` для статуса разрешения конфликта. Следующий шаг по плану — онбординг 3: гостевая сессия и защищённая основа API.
+
+## Онбординг 3: первый мини шаг, 2026-11-12
+
+- Карточка задачи в Notion переведена в «В работе». Из-за занятого другим чатом worktree создан отдельный управляемый worktree от `origin/feat/onboarding-storage`.
+- Через Context7 проверены актуальные сведения FastAPI TestClient/Response cookies, Pydantic v2 `extra='forbid'` и безопасные validation errors, HTTPX ASGITransport/cookie jar.
+- Добавлены первые RED-тесты `tests/api/conftest.py` и `tests/api/test_browser_session.py` для создания/повторного использования гостевой cookie и GET `/api/v1/context` с `Cache-Control: no-store`.
+- Проверки: Ruff lint/format и `git diff --check` прошли. RED-прогон дал 2 ошибки на ожидаемом отсутствии `english_for_developers.app`; реализации API ещё нет. Базовые 191 unit-тест шага 2 проходят во временном окружении.
+- Следующий мини шаг после согласия: добавить зависимости FastAPI/HTTPX/Pydantic в проект и минимальную основу приложения, чтобы RED-тесты падали уже на конкретном отсутствии маршрутов/поведения.
+
+## Онбординг 3: второй мини шаг, 2026-11-12
+
+- В `pyproject.toml` добавлены FastAPI, HTTPX и Pydantic; `uv.lock` обновлён с актуальными разрешёнными версиями.
+- Создан `src/english_for_developers/app.py` с фабрикой `create_app()` и базовым FastAPI-приложением.
+- Проверки: RED-тесты гостевой сессии теперь дают 2 ожидаемых `404` на отсутствующие маршруты; Ruff lint/format, mypy и `git diff --check` проходят.
+- Следующий мини шаг: реализовать защищённую основу API и первый маршрут `POST /api/v1/browser-session` с тестом создания/повтора cookie.
+
+## Онбординг 3: третий мини шаг, 2026-11-12
+
+- Добавлены `settings.py` и `accounts/sessions.py`: 32-байтовые непрозрачные токены, SHA-256 хеширование, отдельный CSRF-секрет, точное сравнение Origin и параметры dev/production cookie.
+- Добавлен `tests/unit/test_sessions.py`; 3 теста проходят.
+- Проверки: Ruff lint/format, mypy и `git diff --check` проходят.
+- Следующий мини шаг: подключить настройки и session helpers к FastAPI dependency и реализовать `POST /api/v1/browser-session` с PostgreSQL-сохранением.
+
+## Онбординг 3: четвёртый мини шаг, 2026-11-12
+
+- Добавлены DTO, FastAPI dependencies и маршруты `POST /api/v1/browser-session` и `GET /api/v1/context`.
+- Создание сессии проверяет точный Origin, сохраняет `BrowserSession` через SQLAlchemy, выставляет HttpOnly cookie и возвращает CSRF-секрет; повтор использует действующую cookie. Контекст отвечает без кеширования и не раскрывает данные без сессии.
+- API-тесты используют изолированную in-memory dependency для проверки HTTP-контракта; отдельная интеграционная проверка на PostgreSQL остаётся следующим шагом. Локальный доступ к PostgreSQL сейчас недоступен из песочницы.
+- Проверки: 5 API/unit-тестов проходят, Ruff lint/format, mypy и `git diff --check` проходят.
+- Следующий мини шаг: добавить security-тесты для Origin/CSRF, лишних полей и безопасных ошибок, затем подготовить PostgreSQL-интеграционный прогон.
+
+## Онбординг 3: пятый мини шаг, 2026-11-12
+
+- Добавлены security-тесты для отсутствующего, `null` и чужого Origin, а также запрета лишних полей.
+- Обнаружено и исправлено отражение секретного значения в стандартной validation error FastAPI: приложение теперь возвращает только `type`, `loc` и `msg`.
+- Проверки: 5 API/security-тестов проходят, Ruff lint/format, mypy и `git diff --check` проходят. Вызовы с CSRF пока не добавлены к изменяющим маршрутам; это следующий этап после PostgreSQL-интеграции.
+- Следующий мини шаг: добавить проверку размера JSON и подготовить интеграционные тесты с реальной PostgreSQL.
+
+## Онбординг 3: шестой мини шаг, 2026-11-12
+
+- Добавлен middleware с лимитом JSON-тела 16 KiB. Размер проверяется по фактическому body и не зависит от `Content-Length`.
+- Добавлен security-тест с ложным `Content-Length: 0`; ответ `413 request body too large` подтверждён.
+- Проверки: 6 API/security-тестов проходят, Ruff lint/format, mypy и `git diff --check` проходят.
+- Следующий мини шаг: подготовить интеграционные API-тесты на PostgreSQL и зафиксировать тестовую зависимость времени.
+
+## Онбординг 3: седьмой мини шаг, 2026-11-12
+
+- Время вынесено в FastAPI dependency `get_now`; production использует UTC, тесты могут задавать фиксированный момент.
+- Добавлен тест, подтверждающий срок анонимной сессии ровно 7 суток от внедрённого времени.
+- Проверки: 7 API/security-тестов проходят, Ruff lint/format, mypy и `git diff --check` проходят.
+- Следующий мини шаг: подготовить PostgreSQL-интеграционные фикстуры и проверить сохранение/повтор сессии на реальной схеме.
+
+## Онбординг 3: восьмой мини шаг, 2026-11-12
+
+- Добавлены PostgreSQL-интеграционные тесты сохранения/повтора гостевой сессии и отказа без Origin без dependency override.
+- Ruff, форматирование, mypy и `git diff --check` проходят.
+- Запуск integration suite не выполнен: `TEST_DATABASE_URL` не задан, а доступ к локальной PostgreSQL из песочницы запрещён. Ошибка fixture сообщает это явно; результат не считается проверенным на реальной БД.
+- Следующий мини шаг после доступности disposable PostgreSQL: применить миграции, выполнить эти тесты и исправить найденные расхождения.
+
+## Онбординг 3: доступ к disposable PostgreSQL, 2026-11-12
+
+- Docker Compose поднял сервис `postgres`; проверка `docker compose up -d --wait postgres` завершилась успешно, контейнер healthy и слушает только `127.0.0.1:5432`.
+- До запуска Docker daemon интеграции были заблокированы; блокировка снята. Миграции и integration suite ещё не запускались.
+- Следующий мини шаг: направить `TEST_DATABASE_URL` на выделенную БД `_test`, применить Alembic migration и только затем выполнить PostgreSQL-интеграционные тесты.
+
+## Онбординг 3: миграция disposable PostgreSQL, 2026-11-12
+
+- Локальный `.env` создан из шаблона и исключён из Git; `DATABASE_URL` на время операции был направлен только на `english_for_developers_test`.
+- `uv run --locked alembic upgrade head` применил миграцию; `alembic current` показал `0001_onboarding (head)`, а `alembic check` — `No new upgrade operations detected`.
+- Следующий мини шаг: запустить `uv run --locked pytest tests/integration -q` с `TEST_DATABASE_URL` и исправить только подтверждённые расхождения.
+
+## Онбординг 3: PostgreSQL integration suite, 2026-11-12
+
+- `uv run --locked pytest tests/integration -q` с `TEST_DATABASE_URL` завершился успешно: 19 passed за 1.08 s.
+- Обнаружено одно warning: используемый FastAPI/Starlette `TestClient` предупреждает о будущем устаревании с текущим HTTPX. Функционального расхождения нет; обновление тестового стека не входит в этот мини шаг.
+- Все запланированные PostgreSQL-интеграционные проверки гостевой сессии подтверждены. Следующий шаг задачи — добавить CSRF-проверку для изменяющих маршрутов отдельной порцией.
+
+## Онбординг 3: CSRF для повторного POST сессии, 2026-11-12
+
+- Повторный `POST /api/v1/browser-session` с действующей guest-cookie теперь требует совпадающий `X-CSRF-Token`; первый запрос по-прежнему требует только точный `Origin`, потому что до него секрета ещё нет.
+- Новый API-тест сначала подтвердил небезопасное прежнее поведение (`200` без CSRF), затем проходит для отсутствующего и неверного токена. Повторы в API- и PostgreSQL-интеграционных тестах передают выданный секрет.
+- Полный запуск выявил конфликт pytest для одинаковых имён `test_browser_session.py` в двух каталогах без `__init__.py`. В `pyproject.toml` выбран рекомендуемый `--import-mode=importlib`; тесты не импортируют друг друга, поэтому ограничение режима неприменимо.
+- Проверки: Ruff lint/format и mypy прошли; полный `uv run --locked pytest tests -q` — 221 passed за 0.83 s. Сохраняется одно предупреждение об устаревании TestClient с текущим HTTPX.
+- Следующий мини шаг: подготовить минимальные маршруты начала прохождения и применить CSRF к первой операции, изменяющей run.
