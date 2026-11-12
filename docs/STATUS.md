@@ -150,3 +150,10 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 - Создан `src/english_for_developers/app.py` с фабрикой `create_app()` и базовым FastAPI-приложением.
 - Проверки: RED-тесты гостевой сессии теперь дают 2 ожидаемых `404` на отсутствующие маршруты; Ruff lint/format, mypy и `git diff --check` проходят.
 - Следующий мини шаг: реализовать защищённую основу API и первый маршрут `POST /api/v1/browser-session` с тестом создания/повтора cookie.
+
+## Онбординг 3: третий мини шаг, 2026-11-12
+
+- Добавлены `settings.py` и `accounts/sessions.py`: 32-байтовые непрозрачные токены, SHA-256 хеширование, отдельный CSRF-секрет, точное сравнение Origin и параметры dev/production cookie.
+- Добавлен `tests/unit/test_sessions.py`; 3 теста проходят.
+- Проверки: Ruff lint/format, mypy и `git diff --check` проходят.
+- Следующий мини шаг: подключить настройки и session helpers к FastAPI dependency и реализовать `POST /api/v1/browser-session` с PostgreSQL-сохранением.
