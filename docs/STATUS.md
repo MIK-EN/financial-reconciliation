@@ -199,3 +199,15 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 - Docker Compose поднял сервис `postgres`; проверка `docker compose up -d --wait postgres` завершилась успешно, контейнер healthy и слушает только `127.0.0.1:5432`.
 - До запуска Docker daemon интеграции были заблокированы; блокировка снята. Миграции и integration suite ещё не запускались.
 - Следующий мини шаг: направить `TEST_DATABASE_URL` на выделенную БД `_test`, применить Alembic migration и только затем выполнить PostgreSQL-интеграционные тесты.
+
+## Онбординг 3: миграция disposable PostgreSQL, 2026-11-12
+
+- Локальный `.env` создан из шаблона и исключён из Git; `DATABASE_URL` на время операции был направлен только на `english_for_developers_test`.
+- `uv run --locked alembic upgrade head` применил миграцию; `alembic current` показал `0001_onboarding (head)`, а `alembic check` — `No new upgrade operations detected`.
+- Следующий мини шаг: запустить `uv run --locked pytest tests/integration -q` с `TEST_DATABASE_URL` и исправить только подтверждённые расхождения.
+
+## Онбординг 3: PostgreSQL integration suite, 2026-11-12
+
+- `uv run --locked pytest tests/integration -q` с `TEST_DATABASE_URL` завершился успешно: 19 passed за 1.08 s.
+- Обнаружено одно warning: используемый FastAPI/Starlette `TestClient` предупреждает о будущем устаревании с текущим HTTPX. Функционального расхождения нет; обновление тестового стека не входит в этот мини шаг.
+- Все запланированные PostgreSQL-интеграционные проверки гостевой сессии подтверждены. Следующий шаг задачи — добавить CSRF-проверку для изменяющих маршрутов отдельной порцией.
