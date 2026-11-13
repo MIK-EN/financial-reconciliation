@@ -310,7 +310,9 @@ def select_level(
         )
         .with_for_update()
     )
-    if run is None or run.status != "completed" or run.expires_at <= now:
+    if run is None:
+        raise OnboardingNotFound("run is unavailable")
+    if run.status != "completed" or run.expires_at <= now:
         raise ValueError("run is unavailable")
     if run.revision != expected_revision:
         if run.selected_level != selected_level:

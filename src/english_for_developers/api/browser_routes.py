@@ -258,6 +258,9 @@ def update_selection(
     session = _require_onboarding_mutation_access(db, settings, request, origin, csrf_token, now)
     try:
         run = select_level(db, session, run_id, body.selected_level, body.expected_revision, now)
+    # OnboardingNotFound subclasses ValueError: map the hidden resource before the conflict.
+    except OnboardingNotFound as exc:
+        raise ApiError(404, "onboarding_not_found", "Onboarding resource was not found") from exc
     except ValueError as exc:
         raise ApiError(409, "selection_conflict", "Selection cannot be accepted") from exc
     return _completed_run_response(run)
