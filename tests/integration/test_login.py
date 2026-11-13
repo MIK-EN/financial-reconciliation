@@ -81,6 +81,12 @@ def test_login_recovers_lost_registration_cookie_and_rotates_without_claim(
                 body["expires_at"].replace("Z", "+00:00")
             )
             assert auth.expires_at - auth.created_at == timedelta(days=7)
+            historical = db.scalar(
+                select(BrowserSession).where(
+                    BrowserSession.token_hash == hash_session_token(lost_token)
+                )
+            )
+            assert historical is not None and historical.revoked_at is None
             if previous_token:
                 previous = db.scalar(
                     select(BrowserSession).where(

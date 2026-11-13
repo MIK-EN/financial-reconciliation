@@ -20,7 +20,7 @@ def _requires_no_store(request: Request) -> bool:
         request.method == "PUT"
         and request.url.path.startswith("/api/v1/onboarding/")
         and request.url.path.endswith("/selection")
-    ) or request.url.path in {"/api/v1/auth/register", "/api/v1/auth/login"}
+    ) or request.url.path in {"/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/logout"}
 
 
 def create_app() -> FastAPI:

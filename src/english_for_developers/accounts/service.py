@@ -29,6 +29,30 @@ _DUMMY_PASSWORD_HASH = (
 )
 
 
+def logout(db: Session, auth_token: str | None, csrf_token: str | None, now: datetime) -> None:
+    if not auth_token or not auth_token.isascii():
+        return
+    statement = select(BrowserSession).where(
+        BrowserSession.token_hash == hash_session_token(auth_token),
+        BrowserSession.kind == "authenticated",
+        BrowserSession.revoked_at.is_(None),
+        BrowserSession.expires_at > now,
+    )
+    with db.begin():
+        auth = db.scalar(statement)
+        if auth is None:
+            return
+        try:
+            require_csrf_token(csrf_token, auth.csrf_secret)
+            auth = db.scalar(statement.with_for_update().execution_options(populate_existing=True))
+            if auth is None:
+                return
+            require_csrf_token(csrf_token, auth.csrf_secret)
+        except (ValueError, TypeError) as exc:
+            raise ApiError(403, "csrf_not_allowed", "CSRF token is invalid") from exc
+        auth.revoked_at = now
+
+
 def _require_login_guest(
     guest: BrowserSession | None, csrf_token: str | None, now: datetime
 ) -> None:

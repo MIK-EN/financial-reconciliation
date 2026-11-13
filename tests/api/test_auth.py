@@ -48,7 +48,8 @@ def test_login_validation_never_reflects_password(body: dict) -> None:
 
 
 @pytest.mark.parametrize("status", [413, 500])
-def test_login_error_responses_disable_caching(status: int) -> None:
+@pytest.mark.parametrize("route", ["login", "logout"])
+def test_auth_error_responses_disable_caching(status: int, route: str) -> None:
     app = create_app()
 
     def unexpected_database_error() -> None:
@@ -58,9 +59,21 @@ def test_login_error_responses_disable_caching(status: int) -> None:
     password = "x" * 17000 if status == 413 else "synthetic password"
     with TestClient(app, raise_server_exceptions=False) as client:
         response = client.post(
-            "/api/v1/auth/login", json={"username": "reader", "password": password}
+            f"/api/v1/auth/{route}",
+            json={"username": "reader", "password": password}
+            if route == "login"
+            else ({"extra": password} if status == 413 else {}),
         )
     assert response.status_code == status
     assert response.headers["cache-control"] == "no-store"
     assert "set-cookie" not in response.headers
     assert password not in response.text and "private failure details" not in response.text
+
+
+def test_logout_rejects_extra_fields_without_deleting_cookie() -> None:
+    with TestClient(create_app()) as client:
+        response = client.post("/api/v1/auth/logout", json={"extra": "forbidden"})
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
+    assert response.headers["cache-control"] == "no-store"
+    assert "set-cookie" not in response.headers
