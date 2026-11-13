@@ -27,6 +27,10 @@ class OnboardingNotFound(ValueError):
     """The requested onboarding resource is not visible to this owner."""
 
 
+class ContentVersionMismatch(ValueError):
+    """The answer targets a different immutable content version."""
+
+
 @dataclass(frozen=True)
 class ActiveRun:
     id: UUID
@@ -198,7 +202,7 @@ def submit_answer(
     if bundle is None:
         raise ValueError("run state is unavailable")
     if run.content_version != content_version:
-        raise ValueError("stale run state")
+        raise ContentVersionMismatch("content version mismatch")
     text = validate_bundle(bundle.content_json).get_text(step.text_id)
     try:
         evaluation = evaluate_answer(text, mode, word_ids, run.threshold_percent)  # type: ignore[arg-type]

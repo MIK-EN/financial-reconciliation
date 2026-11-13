@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from english_for_developers.accounts.sessions import (
     session_cookie_options,
 )
 from english_for_developers.api.dependencies import get_db, get_now, get_settings
+from english_for_developers.api.errors import ApiError
 from english_for_developers.api.schemas import (
     ActiveRunResponse,
     ActiveStepResponse,
@@ -30,6 +31,7 @@ from english_for_developers.api.schemas import (
 from english_for_developers.onboarding.service import (
     ActiveRun,
     CompletedRun,
+    ContentVersionMismatch,
     InvalidAnswer,
     OnboardingNotFound,
     read_run,
@@ -41,6 +43,20 @@ from english_for_developers.settings import Settings
 from english_for_developers.storage.models import BrowserSession
 
 router = APIRouter(prefix="/api/v1")
+
+
+def _require_allowed_origin(origin: str | None, expected_origin: str) -> None:
+    try:
+        require_origin(origin, expected_origin)
+    except ValueError as exc:
+        raise ApiError(403, "origin_not_allowed", "Request origin is not allowed") from exc
+
+
+def _require_matching_csrf(csrf_token: str | None, expected_token: str) -> None:
+    try:
+        require_csrf_token(csrf_token, expected_token)
+    except ValueError as exc:
+        raise ApiError(403, "csrf_not_allowed", "CSRF token is invalid") from exc
 
 
 def _active_session(db: Session, token: str | None, now: datetime) -> BrowserSession | None:
@@ -77,6 +93,22 @@ def _ensure_session(
     return session, raw_token, True
 
 
+def _require_onboarding_mutation_access(
+    db: Session,
+    settings: Settings,
+    request: Request,
+    origin: str | None,
+    csrf_token: str | None,
+    now: datetime,
+) -> BrowserSession:
+    _require_allowed_origin(origin, settings.expected_origin)
+    session = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
+    if session is None:
+        raise ApiError(403, "session_unavailable", "Anonymous session is unavailable")
+    _require_matching_csrf(csrf_token, session.csrf_secret)
+    return session
+
+
 @router.post("/browser-session", response_model=BrowserSessionResponse, status_code=201)
 def create_browser_session(
     body: EmptyBody,
@@ -89,17 +121,11 @@ def create_browser_session(
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> BrowserSessionResponse:
     del body
-    try:
-        require_origin(origin, settings.expected_origin)
-    except ValueError as exc:
-        raise HTTPException(status_code=403, detail="origin not allowed") from exc
+    _require_allowed_origin(origin, settings.expected_origin)
 
     existing = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
     if existing is not None:
-        try:
-            require_csrf_token(csrf_token, existing.csrf_secret)
-        except ValueError as exc:
-            raise HTTPException(status_code=403, detail="csrf token not allowed") from exc
+        _require_matching_csrf(csrf_token, existing.csrf_secret)
         session, token, created = existing, "", False
     else:
         session, token, created = _ensure_session(db, settings, None, now)
@@ -149,15 +175,11 @@ def create_onboarding_run(
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> ActiveRunResponse | CompletedRunResponse:
     del body
+    session = _require_onboarding_mutation_access(db, settings, request, origin, csrf_token, now)
     try:
-        require_origin(origin, settings.expected_origin)
-        session = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
-        if session is None:
-            raise ValueError("anonymous session is unavailable")
-        require_csrf_token(csrf_token, session.csrf_secret)
         run = start_run(db, session, now)
     except ValueError as exc:
-        raise HTTPException(status_code=403, detail="onboarding access not allowed") from exc
+        raise ApiError(409, "onboarding_start_conflict", "Onboarding cannot be started") from exc
 
     response.status_code = 201 if isinstance(run, ActiveRun) and run.created else 200
     response.headers["Cache-Control"] = "no-store"
@@ -175,11 +197,11 @@ def get_onboarding_run(
 ) -> ActiveRunResponse | CompletedRunResponse:
     session = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
     if session is None:
-        raise HTTPException(status_code=404, detail="onboarding run not found")
+        raise ApiError(404, "onboarding_not_found", "Onboarding resource was not found")
     try:
         run = read_run(db, session, run_id, now)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail="onboarding run not found") from exc
+        raise ApiError(404, "onboarding_not_found", "Onboarding resource was not found") from exc
     response.headers["Cache-Control"] = "no-store"
     return _run_response(run)
 
@@ -198,12 +220,8 @@ def create_answer(
     now: datetime = Depends(get_now),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> ActiveRunResponse | CompletedRunResponse:
+    session = _require_onboarding_mutation_access(db, settings, request, origin, csrf_token, now)
     try:
-        require_origin(origin, settings.expected_origin)
-        session = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
-        if session is None:
-            raise ValueError("anonymous session is unavailable")
-        require_csrf_token(csrf_token, session.csrf_secret)
         run = submit_answer(
             db,
             session,
@@ -215,11 +233,13 @@ def create_answer(
             now,
         )
     except OnboardingNotFound as exc:
-        raise HTTPException(status_code=404, detail="onboarding resource not found") from exc
+        raise ApiError(404, "onboarding_not_found", "Onboarding resource was not found") from exc
     except InvalidAnswer as exc:
-        raise HTTPException(status_code=422, detail="invalid answer") from exc
+        raise ApiError(422, "invalid_answer", "Answer is invalid") from exc
+    except ContentVersionMismatch as exc:
+        raise ApiError(409, "content_version_mismatch", "Content version does not match") from exc
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail="answer cannot be accepted") from exc
+        raise ApiError(409, "answer_conflict", "Answer cannot be accepted") from exc
     response.headers["Cache-Control"] = "no-store"
     return _run_response(run)
 
@@ -235,15 +255,11 @@ def update_selection(
     now: datetime = Depends(get_now),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> CompletedRunResponse:
+    session = _require_onboarding_mutation_access(db, settings, request, origin, csrf_token, now)
     try:
-        require_origin(origin, settings.expected_origin)
-        session = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
-        if session is None:
-            raise ValueError("anonymous session is unavailable")
-        require_csrf_token(csrf_token, session.csrf_secret)
         run = select_level(db, session, run_id, body.selected_level, body.expected_revision, now)
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail="selection cannot be accepted") from exc
+        raise ApiError(409, "selection_conflict", "Selection cannot be accepted") from exc
     return _completed_run_response(run)
 
 

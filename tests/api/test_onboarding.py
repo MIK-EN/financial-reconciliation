@@ -347,14 +347,27 @@ def test_unknown_word_id_is_rejected_without_changing_run(client: Any) -> None:
 
 
 @pytest.mark.parametrize(
-    ("answer_override", "expected_status"),
+    ("answer_override", "expected_status", "expected_code"),
     [
-        pytest.param({"word_ids": ["w1", "w1"]}, 422, id="duplicate-word-ids"),
-        pytest.param({"content_version": "stale-version"}, 409, id="content-version-mismatch"),
+        pytest.param(
+            {"word_ids": ["w1", "w1"]},
+            422,
+            "invalid_answer",
+            id="duplicate-word-ids",
+        ),
+        pytest.param(
+            {"content_version": "stale-version"},
+            409,
+            "content_version_mismatch",
+            id="content-version-mismatch",
+        ),
     ],
 )
 def test_invalid_answer_does_not_change_run(
-    client: Any, answer_override: dict[str, object], expected_status: int
+    client: Any,
+    answer_override: dict[str, object],
+    expected_status: int,
+    expected_code: str,
 ) -> None:
     headers = {"Origin": "http://testserver"}
     session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
@@ -379,5 +392,8 @@ def test_invalid_answer_does_not_change_run(
     state = client.get(f"/api/v1/onboarding/{started['id']}")
 
     assert response.status_code == expected_status
+    assert response.json()["code"] == expected_code
+    assert len(response.json()["request_id"]) == 32
+    assert response.headers["x-request-id"] == response.json()["request_id"]
     assert state.json()["revision"] == 0
     assert state.json()["step"] == started["step"]
