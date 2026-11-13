@@ -8,6 +8,7 @@ from queue import Queue
 from time import monotonic
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
@@ -19,8 +20,9 @@ from english_for_developers.storage.models import BrowserSession, OnboardingRun,
 CONTENT_PATH = Path(__file__).resolve().parents[2] / "content" / "onboarding-v1.json"
 
 
-def test_answer_rechecks_revoked_session_after_waiting_for_its_lock(
-    test_engine: Engine,
+@pytest.mark.parametrize("session_change", ["revoked", "expired"])
+def test_answer_rechecks_session_after_waiting_for_its_lock(
+    test_engine: Engine, session_change: str
 ) -> None:
     now = datetime.now(UTC)
     owner_id = uuid4()
@@ -70,7 +72,10 @@ def test_answer_rechecks_revoked_session_after_waiting_for_its_lock(
                 select(BrowserSession).where(BrowserSession.id == owner_id).with_for_update()
             )
             assert locked_owner is not None
-            locked_owner.revoked_at = now
+            if session_change == "revoked":
+                locked_owner.revoked_at = now
+            else:
+                locked_owner.expires_at = now
             revoker.flush()
             future = executor.submit(answer)
             pid = backend_pid.get(timeout=5)
