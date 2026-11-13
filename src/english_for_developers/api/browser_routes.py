@@ -36,6 +36,7 @@ from english_for_developers.onboarding.service import (
     InvalidAnswer,
     OnboardingNotFound,
     RunExpired,
+    SessionUnavailable,
     read_run,
     select_level,
     start_run,
@@ -62,7 +63,7 @@ def _require_matching_csrf(csrf_token: str | None, expected_token: str) -> None:
 
 
 def _active_session(db: Session, token: str | None, now: datetime) -> BrowserSession | None:
-    if not token:
+    if not token or not token.isascii():
         return None
     session = db.scalar(
         select(BrowserSession).where(BrowserSession.token_hash == hash_session_token(token))
@@ -72,6 +73,40 @@ def _active_session(db: Session, token: str | None, now: datetime) -> BrowserSes
     if session.revoked_at is not None or session.expires_at <= now:
         return None
     return session
+
+
+def _active_auth_session(db: Session, token: str | None, now: datetime) -> BrowserSession | None:
+    if not token or not token.isascii():
+        return None
+    session = db.scalar(
+        select(BrowserSession).where(BrowserSession.token_hash == hash_session_token(token))
+    )
+    if (
+        session is None
+        or session.kind != "authenticated"
+        or session.revoked_at is not None
+        or session.expires_at <= now
+    ):
+        return None
+    return session
+
+
+def _run_owner_session(
+    db: Session, request: Request, settings: Settings, run_id: UUID, now: datetime
+) -> tuple[BrowserSession | None, BrowserSession | None]:
+    guest = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
+    auth = _active_auth_session(db, request.cookies.get(settings.auth_cookie_name), now)
+    candidate = db.scalar(select(OnboardingRun).where(OnboardingRun.id == run_id))
+    if candidate is not None:
+        if auth is not None and candidate.user_id == auth.user_id:
+            return auth, auth
+        if (
+            guest is not None
+            and candidate.user_id is None
+            and candidate.anonymous_session_id == guest.id
+        ):
+            return guest, guest
+    return None, auth or guest
 
 
 def _ensure_session(
@@ -230,7 +265,7 @@ def get_onboarding_run(
     now: datetime = Depends(get_now),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> ActiveRunResponse | CompletedRunResponse:
-    session = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
+    session, _ = _run_owner_session(db, request, settings, run_id, now)
     if session is None:
         raise ApiError(404, "onboarding_not_found", "Onboarding resource was not found")
     try:
@@ -290,7 +325,12 @@ def update_selection(
     now: datetime = Depends(get_now),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> CompletedRunResponse:
-    session = _require_onboarding_mutation_access(db, settings, request, origin, csrf_token, now)
+    _require_allowed_origin(origin, settings.expected_origin)
+    owner, fallback = _run_owner_session(db, request, settings, run_id, now)
+    session = owner or fallback
+    if session is None:
+        raise ApiError(403, "session_unavailable", "Browser session is unavailable")
+    _require_matching_csrf(csrf_token, session.csrf_secret)
     try:
         run = select_level(db, session, run_id, body.selected_level, body.expected_revision, now)
     # OnboardingNotFound subclasses ValueError: map the hidden resource before the conflict.
@@ -298,6 +338,8 @@ def update_selection(
         raise ApiError(404, "onboarding_not_found", "Onboarding resource was not found") from exc
     except RunExpired as exc:
         raise ApiError(410, "run_expired", "Onboarding run has expired") from exc
+    except SessionUnavailable as exc:
+        raise ApiError(403, "session_unavailable", "Browser session is unavailable") from exc
     except ValueError as exc:
         raise ApiError(409, "selection_conflict", "Selection cannot be accepted") from exc
     return _completed_run_response(run)

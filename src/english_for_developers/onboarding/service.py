@@ -35,6 +35,10 @@ class RunExpired(ValueError):
     """The requested onboarding run has expired."""
 
 
+class SessionUnavailable(ValueError):
+    """The selected browser session is no longer active."""
+
+
 @dataclass(frozen=True)
 class ActiveRun:
     id: UUID
@@ -161,16 +165,21 @@ def start_run(
 def read_run(
     db: Session, browser_session: BrowserSession, run_id: UUID, now: datetime
 ) -> ActiveRun | CompletedRun:
-    """Return an active run only to its current anonymous-session owner."""
+    """Return a run to its active guest or account owner."""
     if browser_session.revoked_at is not None or browser_session.expires_at <= now:
-        raise ValueError("anonymous session is unavailable")
+        raise ValueError("session is unavailable")
+    owner_filter = (
+        OnboardingRun.anonymous_session_id == browser_session.id
+        if browser_session.kind == "anonymous"
+        else OnboardingRun.user_id == browser_session.user_id
+    )
     run = db.scalar(
         select(OnboardingRun).where(
             OnboardingRun.id == run_id,
-            OnboardingRun.anonymous_session_id == browser_session.id,
+            owner_filter,
         )
     )
-    if run is None:
+    if run is None or (browser_session.kind == "anonymous" and run.user_id is not None):
         raise ValueError("run is unavailable")
     if run.status == "completed":
         return _completed_run(db, run)
@@ -305,18 +314,38 @@ def select_level(
     now: datetime,
 ) -> CompletedRun:
     """Change a completed run's user-selected level once per revision."""
-    _lock_active_browser_session(db, browser_session, now)
+    locked_session = db.scalar(
+        select(BrowserSession)
+        .where(BrowserSession.id == browser_session.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if (
+        locked_session is None
+        or locked_session.kind != browser_session.kind
+        or locked_session.revoked_at is not None
+        or locked_session.expires_at <= now
+    ):
+        if browser_session.kind == "anonymous":
+            raise SessionUnavailable("anonymous session is unavailable")
+        raise SessionUnavailable("session is unavailable")
+    owner_filter = (
+        OnboardingRun.anonymous_session_id == locked_session.id
+        if locked_session.kind == "anonymous"
+        else OnboardingRun.user_id == locked_session.user_id
+    )
     run = db.scalar(
         select(OnboardingRun)
         .where(
             OnboardingRun.id == run_id,
-            OnboardingRun.anonymous_session_id == browser_session.id,
+            owner_filter,
         )
         .with_for_update()
+        .execution_options(populate_existing=True)
     )
-    if run is None:
+    if run is None or (locked_session.kind == "anonymous" and run.user_id is not None):
         raise OnboardingNotFound("run is unavailable")
-    if run.expires_at <= now:
+    if locked_session.kind == "anonymous" and run.expires_at <= now:
         raise RunExpired("run is unavailable")
     if run.status != "completed":
         raise ValueError("run is unavailable")
