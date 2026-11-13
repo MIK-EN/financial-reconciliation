@@ -114,6 +114,47 @@ def test_repeating_same_answer_returns_current_state(client: Any) -> None:
     assert repeated.json()["step"]["text_id"] == "installation"
 
 
+def test_changed_answer_to_completed_step_is_rejected_without_changing_run(
+    client: Any,
+) -> None:
+    headers = {"Origin": "http://testserver"}
+    session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
+    mutation_headers = {**headers, "X-CSRF-Token": session["csrf_token"]}
+    started = client.post(
+        "/api/v1/onboarding",
+        headers=mutation_headers,
+        json={},
+    ).json()
+    first_answer = {
+        "step_id": started["step"]["id"],
+        "mode": "all_known",
+        "word_ids": [],
+        "content_version": started["bundle_version"],
+    }
+    advanced = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers=mutation_headers,
+        json=first_answer,
+    )
+    assert advanced.status_code == 200
+
+    changed = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers=mutation_headers,
+        json={
+            **first_answer,
+            "mode": "unknown_words",
+            "word_ids": ["w1"],
+        },
+    )
+    reread = client.get(f"/api/v1/onboarding/{started['id']}")
+
+    assert changed.status_code == 409
+    assert changed.json()["code"] == "answer_conflict"
+    assert reread.status_code == 200
+    assert reread.json() == advanced.json()
+
+
 def test_retry_start_with_ten_unknown_after_simplified(client: Any) -> None:
     headers = {"Origin": "http://testserver"}
     session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
