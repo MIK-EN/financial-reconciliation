@@ -69,3 +69,16 @@ def test_password_preserves_spaces_case_and_unicode(password: str, changed_passw
 )
 def test_verify_password_rejects_malformed_or_incompatible_hash(password_hash: str) -> None:
     assert verify_password("a valid password", password_hash) is False
+
+
+@pytest.mark.parametrize(
+    "password_hash",
+    [
+        "$argon2id$v=19$m=65536,t=3,p=4$éééééééé$aGFzaA",
+        "$argon2id$v=19$m=65536,t=3,p=4$c2FsdHNhbHQ$éééééééé",
+        "$argon2id$v=19$m=６５５３６,t=3,p=4$c2FsdHNhbHQ$aGFzaA",
+    ],
+    ids=["unicode-salt", "unicode-digest", "unicode-parameter"],
+)
+def test_verify_password_rejects_non_ascii_stored_hash(password_hash: str) -> None:
+    assert verify_password("a valid password", password_hash) is False
