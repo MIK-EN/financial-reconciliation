@@ -1,7 +1,7 @@
 """Transactional operations for anonymous onboarding runs."""
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
@@ -320,6 +320,7 @@ def select_level(
         .with_for_update()
         .execution_options(populate_existing=True)
     )
+    now = datetime.now(UTC)
     if (
         locked_session is None
         or locked_session.kind != browser_session.kind
@@ -343,6 +344,9 @@ def select_level(
         .with_for_update()
         .execution_options(populate_existing=True)
     )
+    now = datetime.now(UTC)
+    if locked_session.expires_at <= now:
+        raise SessionUnavailable("session is unavailable")
     if run is None or (locked_session.kind == "anonymous" and run.user_id is not None):
         raise OnboardingNotFound("run is unavailable")
     if locked_session.kind == "anonymous" and run.expires_at <= now:

@@ -1,6 +1,6 @@
 """Atomic account registration and browser login."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
@@ -45,7 +45,8 @@ def logout(db: Session, auth_token: str | None, csrf_token: str | None, now: dat
         try:
             require_csrf_token(csrf_token, auth.csrf_secret)
             auth = db.scalar(statement.with_for_update().execution_options(populate_existing=True))
-            if auth is None:
+            now = datetime.now(UTC)
+            if auth is None or auth.expires_at <= now:
                 return
             require_csrf_token(csrf_token, auth.csrf_secret)
         except (ValueError, TypeError) as exc:
@@ -105,13 +106,16 @@ def login(
             .execution_options(populate_existing=True)
         ).all()
         guest = next((s for s in sessions if s.token_hash == guest_hash), None)
-        _require_login_guest(guest, csrf_token, now)
+        _require_login_guest(guest, csrf_token, datetime.now(UTC))
         user = db.scalar(
             select(User)
             .where(User.id == credentials.id)
             .with_for_update()
             .execution_options(populate_existing=True)
         )
+        # The user lock may have waited after the session lock was acquired.
+        now = datetime.now(UTC)
+        _require_login_guest(guest, csrf_token, now)
         if user is None or user.password_hash != password_hash or user.username != username:
             raise ApiError(401, "invalid_credentials", "Invalid username or password")
         for previous in sessions:
@@ -170,6 +174,7 @@ def register(
                 .with_for_update()
                 .execution_options(populate_existing=True)
             ).all()
+            now = datetime.now(UTC)
             if any(
                 s.token_hash == auth_hash
                 and s.kind == "authenticated"
@@ -199,6 +204,9 @@ def register(
                 .with_for_update()
                 .execution_options(populate_existing=True)
             )
+            # Recheck time after the last lock, including any wait for the run.
+            now = datetime.now(UTC)
+            _require_login_guest(guest, csrf_token, now)
             if run is None or run.anonymous_session_id != guest.id or run.user_id is not None:
                 raise ApiError(404, "onboarding_not_found", "Onboarding resource was not found")
             if run.expires_at <= now:
