@@ -228,3 +228,21 @@ def test_registration_uses_separate_secure_production_cookie(
         for flag in ("Secure", "HttpOnly", "Path=/", "SameSite=lax", "Max-Age=604800")
     )
     assert "Domain=" not in cookie
+
+
+def test_registration_repeat_with_active_auth_and_revoked_guest_is_conflict(
+    registration_client: TestClient,
+    test_engine: Engine,
+) -> None:
+    headers, state = _complete(registration_client)
+    assert _register(registration_client, headers, state).status_code == 201
+    cookies = dict(registration_client.cookies)
+    with Session(test_engine) as db:
+        before = _snapshot(db)
+    repeated = _register(registration_client, headers, state)
+    assert repeated.status_code == 409
+    assert repeated.json()["code"] == "already_authenticated"
+    assert "set-cookie" not in repeated.headers
+    assert dict(registration_client.cookies) == cookies
+    with Session(test_engine) as db:
+        assert _snapshot(db) == before

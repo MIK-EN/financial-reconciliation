@@ -46,6 +46,14 @@ def register(
                 .with_for_update()
                 .execution_options(populate_existing=True)
             ).all()
+            if any(
+                s.token_hash == auth_hash
+                and s.kind == "authenticated"
+                and s.revoked_at is None
+                and s.expires_at > now
+                for s in sessions
+            ):
+                raise ApiError(409, "already_authenticated", "Already authenticated")
             guest = next((s for s in sessions if s.token_hash == guest_hash), None)
             if (
                 guest is None
@@ -58,14 +66,6 @@ def register(
                 require_csrf_token(csrf_token, guest.csrf_secret)
             except (ValueError, TypeError) as exc:
                 raise ApiError(403, "csrf_not_allowed", "CSRF token is invalid") from exc
-            if any(
-                s.token_hash == auth_hash
-                and s.kind == "authenticated"
-                and s.revoked_at is None
-                and s.expires_at > now
-                for s in sessions
-            ):
-                raise ApiError(409, "already_authenticated", "Already authenticated")
             existing = db.scalar(select(User).where(User.username == username).with_for_update())
             if existing is not None:
                 raise ApiError(409, "username_unavailable", "Username is unavailable")
