@@ -20,10 +20,20 @@ class BrowserSessionResponse(BaseModel):
     expires_at: datetime
 
 
+class AccountContext(BaseModel):
+    user_id: UUID
+    username: str
+    csrf_token: str
+    current_run_id: UUID | None
+    expires_at: datetime
+
+
 class BrowserContextResponse(BaseModel):
     anonymous_session_id: UUID | None = None
     csrf_token: str | None = None
     saved_run_ids: list[UUID] = []
+    anonymous_run_id: UUID | None = None
+    account: AccountContext | None = None
 
 
 class SegmentResponse(BaseModel):
@@ -90,11 +100,3 @@ class LoginRequest(BaseModel):
 
 class RegistrationRequest(LoginRequest):
     run_id: UUID
-
-
-class AccountContext(BaseModel):
-    user_id: UUID
-    username: str
-    csrf_token: str
-    current_run_id: UUID | None
-    expires_at: datetime

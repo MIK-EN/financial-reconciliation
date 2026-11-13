@@ -18,6 +18,7 @@ from english_for_developers.accounts.sessions import (
 from english_for_developers.api.dependencies import get_db, get_now, get_settings
 from english_for_developers.api.errors import ApiError
 from english_for_developers.api.schemas import (
+    AccountContext,
     ActiveRunResponse,
     ActiveStepResponse,
     AnswerRequest,
@@ -41,7 +42,7 @@ from english_for_developers.onboarding.service import (
     submit_answer,
 )
 from english_for_developers.settings import Settings
-from english_for_developers.storage.models import BrowserSession
+from english_for_developers.storage.models import BrowserSession, OnboardingRun, User
 
 router = APIRouter(prefix="/api/v1")
 
@@ -153,13 +154,46 @@ def get_context(
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> BrowserContextResponse:
     response.headers["Cache-Control"] = "no-store"
-    session = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
-    if session is None:
-        return BrowserContextResponse()
-    return BrowserContextResponse(
-        anonymous_session_id=session.id,
-        csrf_token=session.csrf_secret,
+    guest_token = request.cookies.get(settings.session_cookie_name)
+    session = _active_session(
+        db, guest_token if guest_token and guest_token.isascii() else None, now
     )
+    context = BrowserContextResponse()
+    if session is not None:
+        run = db.scalar(
+            select(OnboardingRun).where(OnboardingRun.anonymous_session_id == session.id)
+        )
+        context.anonymous_session_id = session.id
+        context.csrf_token = session.csrf_secret
+        context.anonymous_run_id = run.id if run is not None else None
+    auth_token = request.cookies.get(settings.auth_cookie_name)
+    if not auth_token or not auth_token.isascii():
+        return context
+    auth = db.scalar(
+        select(BrowserSession).where(
+            BrowserSession.token_hash == hash_session_token(auth_token),
+            BrowserSession.kind == "authenticated",
+            BrowserSession.expires_at > now,
+            BrowserSession.revoked_at.is_(None),
+        )
+    )
+    if auth is not None:
+        user = db.execute(select(User).where(User.id == auth.user_id)).scalar_one()
+        context.account = AccountContext(
+            user_id=user.id,
+            username=user.username,
+            csrf_token=auth.csrf_secret,
+            current_run_id=user.current_run_id,
+            expires_at=auth.expires_at,
+        )
+        context.saved_run_ids = list(
+            db.scalars(
+                select(OnboardingRun.id)
+                .where(OnboardingRun.user_id == user.id)
+                .order_by(OnboardingRun.created_at, OnboardingRun.id)
+            )
+        )
+    return context
 
 
 @router.post(
