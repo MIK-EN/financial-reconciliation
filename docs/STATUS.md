@@ -360,3 +360,8 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 
 - `select_level` теперь использует тот же session-first helper до блокировки completed run. PostgreSQL race-тест удерживает session-row lock, отзывает session и подтверждает ожидание selection через `pg_blocking_pids`.
 - RED selection завершался до снятия session-lock. После исправления он перечитывает отзыв и отклоняется; `selected_level` остаётся `foundations`, revision не меняется.
+
+## Онбординг 4: rollback до commit ответа, 2026-11-13
+
+- PostgreSQL integration-тест после фактического flush перехода инъецирует исключение вместо commit. Закрытие request-like Session откатывает транзакцию; свежая Session видит revision 0, исходный current step и одну незаполненную запись.
+- Mutation-проверка сначала выполняла настоящий commit и лишь затем выбрасывала то же исключение: проверка ожидаемо обнаружила revision 1. После восстановления сбоя до commit тест снова прошёл; production-код не менялся.
