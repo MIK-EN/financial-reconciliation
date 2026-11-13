@@ -359,6 +359,7 @@ def test_completed_run_allows_level_selection(client: Any) -> None:
     assert response.status_code == 200
     assert response.json()["selected_level"] == "basic_docs"
     assert response.json()["revision"] == 3
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_same_level_selection_is_idempotent_with_current_or_stale_revision(

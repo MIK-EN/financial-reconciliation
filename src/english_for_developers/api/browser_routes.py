@@ -249,6 +249,7 @@ def create_answer(
 def update_selection(
     run_id: UUID,
     body: SelectionRequest,
+    response: Response,
     request: Request,
     origin: str | None = Header(default=None),
     csrf_token: str | None = Header(default=None, alias="X-CSRF-Token"),
@@ -266,6 +267,7 @@ def update_selection(
         raise ApiError(410, "run_expired", "Onboarding run has expired") from exc
     except ValueError as exc:
         raise ApiError(409, "selection_conflict", "Selection cannot be accepted") from exc
+    response.headers["Cache-Control"] = "no-store"
     return _completed_run_response(run)
 
 
