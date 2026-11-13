@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DBAPIError
 
+from english_for_developers.api.auth_routes import router as auth_router
 from english_for_developers.api.browser_routes import router as browser_router
 from english_for_developers.api.errors import ApiError
 
@@ -32,7 +33,9 @@ def create_app() -> FastAPI:
     ) -> Response:
         request_id = uuid4().hex
         request.state.request_id = request_id
-        is_selection_request = _is_selection_request(request)
+        is_selection_request = (
+            _is_selection_request(request) or request.url.path == "/api/v1/auth/register"
+        )
         content_type = request.headers.get("content-type", "")
         if request.method in {"POST", "PUT", "PATCH"} and content_type.startswith(
             "application/json"
@@ -109,9 +112,10 @@ def create_app() -> FastAPI:
             },
         )
         response.headers["X-Request-ID"] = request_id
-        if _is_selection_request(request):
+        if _is_selection_request(request) or request.url.path == "/api/v1/auth/register":
             response.headers["Cache-Control"] = "no-store"
         return response
 
+    app.include_router(auth_router)
     app.include_router(browser_router)
     return app

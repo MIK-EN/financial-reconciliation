@@ -4,7 +4,9 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from english_for_developers.accounts.passwords import normalize_username
 
 
 class EmptyBody(BaseModel):
@@ -72,3 +74,24 @@ class AnswerRequest(BaseModel):
     mode: Literal["all_known", "unknown_words"]
     word_ids: list[str]
     content_version: str
+
+
+class RegistrationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
+
+    username: str
+    password: str = Field(min_length=15, max_length=128, repr=False)
+    run_id: UUID
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        return normalize_username(value)
+
+
+class AccountContext(BaseModel):
+    user_id: UUID
+    username: str
+    csrf_token: str
+    current_run_id: UUID
+    expires_at: datetime
