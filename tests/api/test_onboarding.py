@@ -235,6 +235,46 @@ def test_repeating_last_answer_returns_completed_state(client: Any) -> None:
     assert repeated.json()["revision"] == 2
 
 
+def test_start_recovers_completed_run_after_lost_terminal_response(client: Any) -> None:
+    headers = {"Origin": "http://testserver"}
+    session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
+    started = client.post(
+        "/api/v1/onboarding",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={},
+    ).json()
+    simplified = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={
+            "step_id": started["step"]["id"],
+            "mode": "unknown_words",
+            "word_ids": ["w1", "w2", "w3"],
+            "content_version": started["bundle_version"],
+        },
+    ).json()
+    completed = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={
+            "step_id": simplified["step"]["id"],
+            "mode": "all_known",
+            "word_ids": [],
+            "content_version": started["bundle_version"],
+        },
+    )
+
+    recovered = client.post(
+        "/api/v1/onboarding",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={},
+    )
+
+    assert completed.status_code == 200
+    assert recovered.status_code == 200
+    assert recovered.json() == completed.json()
+
+
 def test_completed_run_allows_level_selection(client: Any) -> None:
     headers = {"Origin": "http://testserver"}
     session = client.post("/api/v1/browser-session", headers=headers, json={}).json()

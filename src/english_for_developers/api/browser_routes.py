@@ -135,7 +135,9 @@ def get_context(
     )
 
 
-@router.post("/onboarding", response_model=ActiveRunResponse, status_code=200)
+@router.post(
+    "/onboarding", response_model=ActiveRunResponse | CompletedRunResponse, status_code=200
+)
 def create_onboarding_run(
     body: EmptyBody,
     response: Response,
@@ -145,7 +147,7 @@ def create_onboarding_run(
     db: Session = Depends(get_db),  # noqa: B008
     now: datetime = Depends(get_now),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
-) -> ActiveRunResponse:
+) -> ActiveRunResponse | CompletedRunResponse:
     del body
     try:
         require_origin(origin, settings.expected_origin)
@@ -157,9 +159,9 @@ def create_onboarding_run(
     except ValueError as exc:
         raise HTTPException(status_code=403, detail="onboarding access not allowed") from exc
 
-    response.status_code = 201 if run.created else 200
+    response.status_code = 201 if isinstance(run, ActiveRun) and run.created else 200
     response.headers["Cache-Control"] = "no-store"
-    return _active_run_response(run)
+    return _run_response(run)
 
 
 @router.get("/onboarding/{run_id}", response_model=ActiveRunResponse | CompletedRunResponse)

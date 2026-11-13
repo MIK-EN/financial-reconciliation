@@ -51,8 +51,10 @@ class CompletedRun:
     reason_code: str
 
 
-def start_run(db: Session, browser_session: BrowserSession, now: datetime) -> ActiveRun:
-    """Create an anonymous run once, or return its current active step."""
+def start_run(
+    db: Session, browser_session: BrowserSession, now: datetime
+) -> ActiveRun | CompletedRun:
+    """Create an anonymous run once, or return its current state."""
     locked_session = db.scalar(
         select(BrowserSession).where(BrowserSession.id == browser_session.id).with_for_update()
     )
@@ -69,6 +71,24 @@ def start_run(db: Session, browser_session: BrowserSession, now: datetime) -> Ac
         .with_for_update()
     )
     if existing is not None:
+        if existing.status == "completed":
+            if (
+                existing.recommended_level is None
+                or existing.selected_level is None
+                or existing.reason_code is None
+            ):
+                raise ValueError("completed run is invalid")
+            return CompletedRun(
+                id=existing.id,
+                revision=existing.revision,
+                bundle_version=existing.content_version,
+                expires_at=existing.expires_at,
+                recommended_level=existing.recommended_level,
+                selected_level=existing.selected_level,
+                reason_code=existing.reason_code,
+            )
+        if existing.status != "active":
+            raise ValueError("run is unavailable")
         step = db.get(OnboardingStep, existing.current_step_id)
         if step is None:
             raise ValueError("active run has no current step")
