@@ -335,3 +335,8 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 - Закрыто третье Important-замечание предварительного ревью. Security-предусловия вынесены из общих доменных `try`: Origin/CSRF для start, answer и selection возвращают 403, а не 409. Browser-session использует тот же механизм.
 - Добавлены общий `ApiError`, request ID на каждый HTTP-ответ и стабильные `code/message/request_id`; validation сохраняет безопасный список полей, body limit возвращает 413, а несовпадение версии — отдельный 409 `content_version_mismatch`. Внутренние исключения и входные секреты не отражаются.
 - RED: security-запросы answer/selection давали 409, остальные ошибки использовали старый `detail`. GREEN: 13 узких security/error-проверок и весь API-набор прошли. Итоговые проверки: Ruff lint и format-check успешны; mypy успешен; полный `pytest tests -q` с disposable PostgreSQL — 244 passed.
+
+## Онбординг 4: сквозной PostgreSQL HTTP-сценарий, 2026-11-13
+
+- Добавлен реальный HTTP integration-тест через disposable PostgreSQL: browser-session → start → два ответа до completion → selection → отдельный GET. Финальный GET обязан вернуть тот же completed DTO с сохранёнными `selected_level` и revision.
+- Сценарий уже поддерживался production-кодом. Mutation-проверка без commit выбора ожидаемо упала: PUT вернул revision 3 и `basic_docs`, а новый GET увидел revision 2 и `foundations`; после восстановления commit тест снова прошёл.
