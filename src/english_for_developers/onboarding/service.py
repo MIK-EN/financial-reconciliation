@@ -57,19 +57,30 @@ class CompletedRun:
     saved_to_account: bool
 
 
-def start_run(
+def _lock_active_browser_session(
     db: Session, browser_session: BrowserSession, now: datetime
-) -> ActiveRun | CompletedRun:
-    """Create an anonymous run once, or return its current state."""
+) -> BrowserSession:
     locked_session = db.scalar(
-        select(BrowserSession).where(BrowserSession.id == browser_session.id).with_for_update()
+        select(BrowserSession)
+        .where(BrowserSession.id == browser_session.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     if (
         locked_session is None
+        or locked_session.kind != "anonymous"
         or locked_session.revoked_at is not None
         or locked_session.expires_at <= now
     ):
         raise ValueError("anonymous session is unavailable")
+    return locked_session
+
+
+def start_run(
+    db: Session, browser_session: BrowserSession, now: datetime
+) -> ActiveRun | CompletedRun:
+    """Create an anonymous run once, or return its current state."""
+    locked_session = _lock_active_browser_session(db, browser_session, now)
 
     existing = db.scalar(
         select(OnboardingRun)
@@ -178,6 +189,7 @@ def submit_answer(
     now: datetime,
 ) -> ActiveRun | CompletedRun:
     """Persist one answer and create the next active step."""
+    _lock_active_browser_session(db, browser_session, now)
     run = db.scalar(
         select(OnboardingRun)
         .where(
