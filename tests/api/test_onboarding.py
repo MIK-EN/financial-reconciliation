@@ -427,6 +427,65 @@ def test_same_level_selection_is_idempotent_with_current_or_stale_revision(
     assert same_stale.json() == changed.json()
 
 
+def test_stale_selection_with_different_level_is_rejected_without_changing_run(
+    client: Any,
+) -> None:
+    headers = {"Origin": "http://testserver"}
+    session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
+    mutation_headers = {**headers, "X-CSRF-Token": session["csrf_token"]}
+    started = client.post(
+        "/api/v1/onboarding",
+        headers=mutation_headers,
+        json={},
+    ).json()
+    simplified = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers=mutation_headers,
+        json={
+            "step_id": started["step"]["id"],
+            "mode": "unknown_words",
+            "word_ids": ["w1", "w2", "w3"],
+            "content_version": started["bundle_version"],
+        },
+    ).json()
+    completed = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers=mutation_headers,
+        json={
+            "step_id": simplified["step"]["id"],
+            "mode": "all_known",
+            "word_ids": [],
+            "content_version": started["bundle_version"],
+        },
+    ).json()
+    changed = client.put(
+        f"/api/v1/onboarding/{started['id']}/selection",
+        headers=mutation_headers,
+        json={
+            "selected_level": "confident_reading",
+            "expected_revision": completed["revision"],
+        },
+    )
+    rejected = client.put(
+        f"/api/v1/onboarding/{started['id']}/selection",
+        headers=mutation_headers,
+        json={
+            "selected_level": "complex_texts",
+            "expected_revision": completed["revision"],
+        },
+    )
+    current = client.get(f"/api/v1/onboarding/{started['id']}", headers=headers)
+
+    assert changed.status_code == 200
+    assert changed.json()["revision"] == completed["revision"] + 1
+    assert changed.json()["selected_level"] == "confident_reading"
+    assert rejected.status_code == 409
+    assert rejected.json()["code"] == "selection_conflict"
+    assert rejected.json()["message"] == "Selection cannot be accepted"
+    assert rejected.headers["x-request-id"] == rejected.json()["request_id"]
+    assert current.json() == changed.json()
+
+
 def test_unknown_word_id_is_rejected_without_changing_run(client: Any) -> None:
     headers = {"Origin": "http://testserver"}
     session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
