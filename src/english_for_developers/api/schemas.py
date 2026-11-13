@@ -54,6 +54,8 @@ class CompletedRunResponse(BaseModel):
     recommended_level: str
     selected_level: str
     reason_code: str
+    explanation: str
+    saved_to_account: bool
 
 
 class SelectionRequest(BaseModel):

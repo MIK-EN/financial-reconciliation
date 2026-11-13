@@ -280,4 +280,6 @@ def _completed_run_response(run: CompletedRun) -> CompletedRunResponse:
         recommended_level=run.recommended_level,
         selected_level=run.selected_level,
         reason_code=run.reason_code,
+        explanation=run.explanation,
+        saved_to_account=run.saved_to_account,
     )

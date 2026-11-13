@@ -49,6 +49,8 @@ class CompletedRun:
     recommended_level: str
     selected_level: str
     reason_code: str
+    explanation: str
+    saved_to_account: bool
 
 
 def start_run(
@@ -72,21 +74,7 @@ def start_run(
     )
     if existing is not None:
         if existing.status == "completed":
-            if (
-                existing.recommended_level is None
-                or existing.selected_level is None
-                or existing.reason_code is None
-            ):
-                raise ValueError("completed run is invalid")
-            return CompletedRun(
-                id=existing.id,
-                revision=existing.revision,
-                bundle_version=existing.content_version,
-                expires_at=existing.expires_at,
-                recommended_level=existing.recommended_level,
-                selected_level=existing.selected_level,
-                reason_code=existing.reason_code,
-            )
+            return _completed_run(db, existing)
         if existing.status != "active":
             raise ValueError("run is unavailable")
         step = db.get(OnboardingStep, existing.current_step_id)
@@ -166,17 +154,7 @@ def read_run(
     if run is None:
         raise ValueError("run is unavailable")
     if run.status == "completed":
-        if run.recommended_level is None or run.selected_level is None or run.reason_code is None:
-            raise ValueError("completed run is invalid")
-        return CompletedRun(
-            id=run.id,
-            revision=run.revision,
-            bundle_version=run.content_version,
-            expires_at=run.expires_at,
-            recommended_level=run.recommended_level,
-            selected_level=run.selected_level,
-            reason_code=run.reason_code,
-        )
+        return _completed_run(db, run)
     if run.status != "active":
         raise ValueError("run is unavailable")
     step = db.get(OnboardingStep, run.current_step_id)
@@ -231,21 +209,7 @@ def submit_answer(
             evaluation.word_ids
         ):
             if run.status == "completed":
-                if (
-                    run.recommended_level is None
-                    or run.selected_level is None
-                    or run.reason_code is None
-                ):
-                    raise ValueError("completed run is invalid")
-                return CompletedRun(
-                    id=run.id,
-                    revision=run.revision,
-                    bundle_version=run.content_version,
-                    expires_at=run.expires_at,
-                    recommended_level=run.recommended_level,
-                    selected_level=run.selected_level,
-                    reason_code=run.reason_code,
-                )
+                return _completed_run(db, run)
             if run.status != "active":
                 raise ValueError("run is unavailable")
             current_step = db.get(OnboardingStep, run.current_step_id)
@@ -273,15 +237,7 @@ def submit_answer(
         run.completed_at = now
         run.revision += 1
         db.commit()
-        return CompletedRun(
-            id=run.id,
-            revision=run.revision,
-            bundle_version=run.content_version,
-            expires_at=run.expires_at,
-            recommended_level=transition.level,
-            selected_level=transition.level,
-            reason_code=transition.reason_code,
-        )
+        return _completed_run(db, run)
 
     next_text = validate_bundle(bundle.content_json).get_text(transition.next_text_id)
     next_step = OnboardingStep(
@@ -346,17 +302,7 @@ def select_level(
         run.selected_level = selected_level
         run.revision += 1
         db.commit()
-    if run.recommended_level is None or run.selected_level is None or run.reason_code is None:
-        raise ValueError("completed run is invalid")
-    return CompletedRun(
-        id=run.id,
-        revision=run.revision,
-        bundle_version=run.content_version,
-        expires_at=run.expires_at,
-        recommended_level=run.recommended_level,
-        selected_level=run.selected_level,
-        reason_code=run.reason_code,
-    )
+    return _completed_run(db, run)
 
 
 def _active_run(
@@ -376,4 +322,30 @@ def _active_run(
         text_id=step.text_id,
         segments=text.segments,
         created=created,
+    )
+
+
+def _completed_run(db: Session, run: OnboardingRun) -> CompletedRun:
+    if run.recommended_level is None or run.selected_level is None or run.reason_code is None:
+        raise ValueError("completed run is invalid")
+    bundle = db.get(ContentBundle, run.content_version)
+    if bundle is None:
+        raise ValueError("run content is unavailable")
+    content = validate_bundle(bundle.content_json)
+    explanation = next(
+        (item.text for item in content.explanations if item.reason_code == run.reason_code),
+        None,
+    )
+    if explanation is None:
+        raise ValueError("run explanation is unavailable")
+    return CompletedRun(
+        id=run.id,
+        revision=run.revision,
+        bundle_version=run.content_version,
+        expires_at=run.expires_at,
+        recommended_level=run.recommended_level,
+        selected_level=run.selected_level,
+        reason_code=run.reason_code,
+        explanation=explanation,
+        saved_to_account=run.user_id is not None,
     )

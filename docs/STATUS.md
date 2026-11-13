@@ -323,3 +323,9 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 - Предварительное ревью Draft PR обнаружило, что повторный start существующего completed run пытался загрузить отсутствующий current step и возвращал 403. Это лишало клиента результата после перезагрузки или потери терминального HTTP-ответа, если `run_id` не сохранился.
 - `start_run` и POST `/api/v1/onboarding` теперь возвращают active/completed union: 201 только при создании, 200 для существующего active или completed run. RED был 403; после исправления повторный start возвращает тот же completed state.
 - Проверки: onboarding API — 12 passed; Ruff lint и format-check успешны; mypy успешен; полный `pytest tests -q` с disposable PostgreSQL — 238 passed.
+
+## Онбординг 4: полный completed DTO, 2026-11-13
+
+- Закрыто второе Important-замечание предварительного ревью: completed response теперь обязательно содержит `explanation` из закреплённой версии bundle и `saved_to_account`, вычисленный по фактическому владельцу run. Для текущего анонимного сценария значение `false`.
+- Общий helper формирует одинаковый completed state для завершения, GET, безопасного повтора ответа, повторного start и selection. RED подтвердил отсутствие explanation; после реализации API возвращает утверждённый текст причины.
+- Проверки: onboarding API — 12 passed; Ruff lint и format-check успешны; mypy успешен; полный `pytest tests -q` с disposable PostgreSQL — 238 passed.

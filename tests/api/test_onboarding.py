@@ -186,6 +186,11 @@ def test_last_answer_completes_run_with_recommendation(client: Any) -> None:
     assert response.json()["recommended_level"] == "foundations"
     assert response.json()["selected_level"] == "foundations"
     assert response.json()["reason_code"] == "simplified_accessible"
+    assert response.json()["explanation"] == (
+        "В коротком тексте о действиях с файлом знакомых слов оказалось больше. "
+        "Начнём с простых команд и частой лексики"
+    )
+    assert response.json()["saved_to_account"] is False
 
     reread = client.get(f"/api/v1/onboarding/{started['id']}")
     assert reread.status_code == 200
