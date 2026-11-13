@@ -15,12 +15,12 @@ from english_for_developers.api.errors import ApiError
 MAX_JSON_BODY_BYTES = 16 * 1024
 
 
-def _is_selection_request(request: Request) -> bool:
+def _requires_no_store(request: Request) -> bool:
     return (
         request.method == "PUT"
         and request.url.path.startswith("/api/v1/onboarding/")
         and request.url.path.endswith("/selection")
-    )
+    ) or request.url.path in {"/api/v1/auth/register", "/api/v1/auth/login"}
 
 
 def create_app() -> FastAPI:
@@ -33,9 +33,7 @@ def create_app() -> FastAPI:
     ) -> Response:
         request_id = uuid4().hex
         request.state.request_id = request_id
-        is_selection_request = (
-            _is_selection_request(request) or request.url.path == "/api/v1/auth/register"
-        )
+        disable_caching = _requires_no_store(request)
         content_type = request.headers.get("content-type", "")
         if request.method in {"POST", "PUT", "PATCH"} and content_type.startswith(
             "application/json"
@@ -51,12 +49,12 @@ def create_app() -> FastAPI:
                     },
                 )
                 error_response.headers["X-Request-ID"] = request_id
-                if is_selection_request:
+                if disable_caching:
                     error_response.headers["Cache-Control"] = "no-store"
                 return error_response
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
-        if is_selection_request:
+        if disable_caching:
             response.headers["Cache-Control"] = "no-store"
         return response
 
@@ -112,7 +110,7 @@ def create_app() -> FastAPI:
             },
         )
         response.headers["X-Request-ID"] = request_id
-        if _is_selection_request(request) or request.url.path == "/api/v1/auth/register":
+        if _requires_no_store(request):
             response.headers["Cache-Control"] = "no-store"
         return response
 

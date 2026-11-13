@@ -76,12 +76,11 @@ class AnswerRequest(BaseModel):
     content_version: str
 
 
-class RegistrationRequest(BaseModel):
+class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
 
     username: str
     password: str = Field(min_length=15, max_length=128, repr=False)
-    run_id: UUID
 
     @field_validator("username")
     @classmethod
@@ -89,9 +88,13 @@ class RegistrationRequest(BaseModel):
         return normalize_username(value)
 
 
+class RegistrationRequest(LoginRequest):
+    run_id: UUID
+
+
 class AccountContext(BaseModel):
     user_id: UUID
     username: str
     csrf_token: str
-    current_run_id: UUID
+    current_run_id: UUID | None
     expires_at: datetime

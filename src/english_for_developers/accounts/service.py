@@ -1,4 +1,4 @@
-"""Atomic account creation and adoption of a completed guest result."""
+"""Atomic account registration and browser login."""
 
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
@@ -7,7 +7,11 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from english_for_developers.accounts.passwords import hash_password, normalize_username
+from english_for_developers.accounts.passwords import (
+    hash_password,
+    normalize_username,
+    verify_password,
+)
 from english_for_developers.accounts.sessions import (
     hash_session_token,
     issue_csrf_secret,
@@ -17,6 +21,102 @@ from english_for_developers.accounts.sessions import (
 from english_for_developers.api.errors import ApiError
 from english_for_developers.api.schemas import AccountContext
 from english_for_developers.storage.models import BrowserSession, OnboardingRun, User
+
+# A valid Argon2 hash makes absent usernames use the same expensive verification path.
+_DUMMY_PASSWORD_HASH = (
+    "$argon2id$v=19$m=65536,t=3,p=4$DXvk7PsddTiUIJj7kE22xg$"
+    "1hnX3khd2wKNg/c+R8+VCCHEQ2f/kLjfCO2E6seqwtU"
+)
+
+
+def _require_login_guest(
+    guest: BrowserSession | None, csrf_token: str | None, now: datetime
+) -> None:
+    if (
+        guest is None
+        or guest.kind != "anonymous"
+        or guest.revoked_at is not None
+        or guest.expires_at <= now
+    ):
+        raise ApiError(403, "session_unavailable", "Anonymous session is unavailable")
+    try:
+        require_csrf_token(csrf_token, guest.csrf_secret)
+    except (ValueError, TypeError) as exc:
+        raise ApiError(403, "csrf_not_allowed", "CSRF token is invalid") from exc
+
+
+def login(
+    db: Session,
+    username: str,
+    password: str,
+    guest_token: str | None,
+    auth_token: str | None,
+    csrf_token: str | None,
+    now: datetime,
+    ttl_days: int,
+) -> tuple[AccountContext, str]:
+    username = normalize_username(username)
+    guest_hash, auth_hash = (
+        hash_session_token(token) if token and token.isascii() else None
+        for token in (guest_token, auth_token)
+    )
+    with db.begin():
+        guest = db.scalar(select(BrowserSession).where(BrowserSession.token_hash == guest_hash))
+        _require_login_guest(guest, csrf_token, now)
+        credentials = db.execute(
+            select(User.id, User.password_hash).where(User.username == username)
+        ).one_or_none()
+    # The read transaction has ended. Argon2 runs without any row locks.
+    password_hash = credentials.password_hash if credentials else _DUMMY_PASSWORD_HASH
+    verified = verify_password(password, password_hash)
+    if credentials is None or not verified:
+        raise ApiError(401, "invalid_credentials", "Invalid username or password")
+    token = issue_session_token()
+    with db.begin():
+        sessions = db.scalars(
+            select(BrowserSession)
+            .where(BrowserSession.token_hash.in_([guest_hash, auth_hash]))
+            .order_by(BrowserSession.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).all()
+        guest = next((s for s in sessions if s.token_hash == guest_hash), None)
+        _require_login_guest(guest, csrf_token, now)
+        user = db.scalar(
+            select(User)
+            .where(User.id == credentials.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if user is None or user.password_hash != password_hash or user.username != username:
+            raise ApiError(401, "invalid_credentials", "Invalid username or password")
+        for previous in sessions:
+            if (
+                previous.token_hash == auth_hash
+                and previous.kind == "authenticated"
+                and previous.revoked_at is None
+                and previous.expires_at > now
+            ):
+                previous.revoked_at = now
+        auth = BrowserSession(
+            id=uuid4(),
+            kind="authenticated",
+            user_id=user.id,
+            token_hash=hash_session_token(token),
+            csrf_secret=issue_csrf_secret(),
+            created_at=now,
+            expires_at=now + timedelta(days=ttl_days),
+        )
+        db.add(auth)
+        context = AccountContext(
+            user_id=user.id,
+            username=user.username,
+            csrf_token=auth.csrf_secret,
+            current_run_id=user.current_run_id,
+            expires_at=auth.expires_at,
+        )
+    # Constraint errors roll back and are mapped to a safe 503 by the API handler.
+    return context, token
 
 
 def register(
