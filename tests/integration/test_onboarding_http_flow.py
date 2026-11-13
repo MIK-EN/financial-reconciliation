@@ -1,17 +1,19 @@
 import json
 import os
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from english_for_developers.app import create_app
 from english_for_developers.content.importer import import_bundle
 from english_for_developers.content.validation import validate_bundle
+from english_for_developers.storage.models import BrowserSession, OnboardingRun
 
 CONTENT_PATH = Path(__file__).resolve().parents[2] / "content" / "onboarding-v1.json"
 
@@ -174,3 +176,93 @@ def test_selection_on_foreign_active_or_unknown_run_is_rejected(
         restored_other = other.get(f"/api/v1/onboarding/{other_started['id']}")
         assert restored_owner.json() == completed_state
         assert restored_other.json() == other_started
+
+
+def test_own_expired_selection_returns_gone_and_foreign_stays_hidden(
+    onboarding_client: TestClient, test_engine: Engine
+) -> None:
+    mutation_headers = _mutation_headers(onboarding_client)
+    started = onboarding_client.post("/api/v1/onboarding", headers=mutation_headers, json={})
+    assert started.status_code == 201
+    active = started.json()
+    simplified = onboarding_client.post(
+        f"/api/v1/onboarding/{active['id']}/answers",
+        headers=mutation_headers,
+        json={
+            "step_id": active["step"]["id"],
+            "mode": "unknown_words",
+            "word_ids": ["w1", "w2", "w3"],
+            "content_version": active["bundle_version"],
+        },
+    )
+    completed = onboarding_client.post(
+        f"/api/v1/onboarding/{active['id']}/answers",
+        headers=mutation_headers,
+        json={
+            "step_id": simplified.json()["step"]["id"],
+            "mode": "all_known",
+            "word_ids": [],
+            "content_version": active["bundle_version"],
+        },
+    )
+    assert completed.status_code == 200
+    completed_state = completed.json()
+
+    with Session(test_engine) as setup:
+        run = setup.get(OnboardingRun, UUID(completed_state["id"]))
+        assert run is not None
+        run.expires_at = datetime.now(UTC) - timedelta(days=1)
+        setup.commit()
+
+    own_expired = onboarding_client.put(
+        f"/api/v1/onboarding/{completed_state['id']}/selection",
+        headers=mutation_headers,
+        json={
+            "selected_level": "basic_docs",
+            "expected_revision": completed_state["revision"],
+        },
+    )
+
+    with TestClient(onboarding_client.app, base_url="http://testserver") as other:
+        other_headers = _mutation_headers(other)
+        foreign_expired = other.put(
+            f"/api/v1/onboarding/{completed_state['id']}/selection",
+            headers=other_headers,
+            json={
+                "selected_level": "basic_docs",
+                "expected_revision": completed_state["revision"],
+            },
+        )
+
+    assert own_expired.status_code == 410
+    assert own_expired.json()["code"] == "run_expired"
+    assert own_expired.json()["message"] == "Onboarding run has expired"
+    assert len(own_expired.json()["request_id"]) == 32
+    assert own_expired.headers["x-request-id"] == own_expired.json()["request_id"]
+    assert foreign_expired.status_code == 404
+    assert foreign_expired.json()["code"] == "onboarding_not_found"
+
+    restored = onboarding_client.get(f"/api/v1/onboarding/{completed_state['id']}")
+    assert restored.status_code == 200
+    restored_state = restored.json()
+    assert restored_state["id"] == completed_state["id"]
+    assert restored_state["revision"] == completed_state["revision"]
+    assert restored_state["selected_level"] == completed_state["selected_level"]
+    assert restored_state["recommended_level"] == completed_state["recommended_level"]
+
+    with Session(test_engine) as setup:
+        for record in setup.scalars(select(BrowserSession)).all():
+            record.expires_at = datetime.now(UTC) - timedelta(days=1)
+        setup.commit()
+
+    expired_cookie = onboarding_client.put(
+        f"/api/v1/onboarding/{completed_state['id']}/selection",
+        headers=mutation_headers,
+        json={
+            "selected_level": "basic_docs",
+            "expected_revision": completed_state["revision"],
+        },
+    )
+
+    assert expired_cookie.status_code == 403
+    assert expired_cookie.json()["code"] == "session_unavailable"

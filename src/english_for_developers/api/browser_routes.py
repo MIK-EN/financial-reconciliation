@@ -34,6 +34,7 @@ from english_for_developers.onboarding.service import (
     ContentVersionMismatch,
     InvalidAnswer,
     OnboardingNotFound,
+    RunExpired,
     read_run,
     select_level,
     start_run,
@@ -261,6 +262,8 @@ def update_selection(
     # OnboardingNotFound subclasses ValueError: map the hidden resource before the conflict.
     except OnboardingNotFound as exc:
         raise ApiError(404, "onboarding_not_found", "Onboarding resource was not found") from exc
+    except RunExpired as exc:
+        raise ApiError(410, "run_expired", "Onboarding run has expired") from exc
     except ValueError as exc:
         raise ApiError(409, "selection_conflict", "Selection cannot be accepted") from exc
     return _completed_run_response(run)

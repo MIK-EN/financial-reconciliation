@@ -31,6 +31,10 @@ class ContentVersionMismatch(ValueError):
     """The answer targets a different immutable content version."""
 
 
+class RunExpired(ValueError):
+    """The requested onboarding run has expired."""
+
+
 @dataclass(frozen=True)
 class ActiveRun:
     id: UUID
@@ -312,7 +316,9 @@ def select_level(
     )
     if run is None:
         raise OnboardingNotFound("run is unavailable")
-    if run.status != "completed" or run.expires_at <= now:
+    if run.expires_at <= now:
+        raise RunExpired("run is unavailable")
+    if run.status != "completed":
         raise ValueError("run is unavailable")
     if run.revision != expected_revision:
         if run.selected_level != selected_level:
