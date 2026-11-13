@@ -361,6 +361,72 @@ def test_completed_run_allows_level_selection(client: Any) -> None:
     assert response.json()["revision"] == 3
 
 
+def test_same_level_selection_is_idempotent_with_current_or_stale_revision(
+    client: Any,
+) -> None:
+    headers = {"Origin": "http://testserver"}
+    session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
+    mutation_headers = {**headers, "X-CSRF-Token": session["csrf_token"]}
+    started = client.post(
+        "/api/v1/onboarding",
+        headers=mutation_headers,
+        json={},
+    ).json()
+    simplified = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers=mutation_headers,
+        json={
+            "step_id": started["step"]["id"],
+            "mode": "unknown_words",
+            "word_ids": ["w1", "w2", "w3"],
+            "content_version": started["bundle_version"],
+        },
+    ).json()
+    completed = client.post(
+        f"/api/v1/onboarding/{started['id']}/answers",
+        headers=mutation_headers,
+        json={
+            "step_id": simplified["step"]["id"],
+            "mode": "all_known",
+            "word_ids": [],
+            "content_version": started["bundle_version"],
+        },
+    ).json()
+
+    same_current = client.put(
+        f"/api/v1/onboarding/{started['id']}/selection",
+        headers=mutation_headers,
+        json={
+            "selected_level": "foundations",
+            "expected_revision": completed["revision"],
+        },
+    )
+    changed = client.put(
+        f"/api/v1/onboarding/{started['id']}/selection",
+        headers=mutation_headers,
+        json={
+            "selected_level": "basic_docs",
+            "expected_revision": completed["revision"],
+        },
+    )
+    same_stale = client.put(
+        f"/api/v1/onboarding/{started['id']}/selection",
+        headers=mutation_headers,
+        json={
+            "selected_level": "basic_docs",
+            "expected_revision": completed["revision"],
+        },
+    )
+
+    assert same_current.status_code == 200
+    assert same_current.json() == completed
+    assert changed.status_code == 200
+    assert changed.json()["revision"] == completed["revision"] + 1
+    assert changed.json()["selected_level"] == "basic_docs"
+    assert same_stale.status_code == 200
+    assert same_stale.json() == changed.json()
+
+
 def test_unknown_word_id_is_rejected_without_changing_run(client: Any) -> None:
     headers = {"Origin": "http://testserver"}
     session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
