@@ -72,8 +72,8 @@ def test_extra_fields_are_rejected_without_echoing_secret_input(client: Any) -> 
 
 def test_json_body_limit_does_not_trust_content_length(client: Any) -> None:
     oversized = b'{"padding":"' + (b"x" * (16 * 1024)) + b'"}'
-    response = client.post(
-        "/api/v1/browser-session",
+    response = client.put(
+        "/api/v1/onboarding/00000000-0000-0000-0000-000000000000/selection",
         headers={
             "Origin": "http://testserver",
             "Content-Type": "application/json",
@@ -83,6 +83,29 @@ def test_json_body_limit_does_not_trust_content_length(client: Any) -> None:
     )
 
     _assert_api_error(response, 413, "request_too_large", "Request body is too large")
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_unexpected_selection_error_still_disables_caching(app: Any) -> None:
+    from fastapi.testclient import TestClient
+
+    def unexpected_database_error() -> None:
+        raise RuntimeError("private failure details")
+
+    app.dependency_overrides[get_db] = unexpected_database_error
+
+    with TestClient(app, raise_server_exceptions=False) as error_client:
+        response = error_client.put(
+            "/api/v1/onboarding/00000000-0000-0000-0000-000000000000/selection",
+            headers={"Origin": "http://testserver"},
+            json={"selected_level": "basic_docs", "expected_revision": 1},
+        )
+
+    assert response.status_code == 500
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["code"] == "internal_error"
+    assert response.headers["x-request-id"] == response.json()["request_id"]
+    assert "private failure details" not in response.text
 
 
 def test_database_failure_returns_safe_service_unavailable(app: Any, client: Any) -> None:

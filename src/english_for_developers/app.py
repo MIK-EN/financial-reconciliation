@@ -14,6 +14,14 @@ from english_for_developers.api.errors import ApiError
 MAX_JSON_BODY_BYTES = 16 * 1024
 
 
+def _is_selection_request(request: Request) -> bool:
+    return (
+        request.method == "PUT"
+        and request.url.path.startswith("/api/v1/onboarding/")
+        and request.url.path.endswith("/selection")
+    )
+
+
 def create_app() -> FastAPI:
     """Create the HTTP application with its route dependencies."""
     app = FastAPI(title="English for Developers")
@@ -24,6 +32,7 @@ def create_app() -> FastAPI:
     ) -> Response:
         request_id = uuid4().hex
         request.state.request_id = request_id
+        is_selection_request = _is_selection_request(request)
         content_type = request.headers.get("content-type", "")
         if request.method in {"POST", "PUT", "PATCH"} and content_type.startswith(
             "application/json"
@@ -39,9 +48,13 @@ def create_app() -> FastAPI:
                     },
                 )
                 error_response.headers["X-Request-ID"] = request_id
+                if is_selection_request:
+                    error_response.headers["Cache-Control"] = "no-store"
                 return error_response
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
+        if is_selection_request:
+            response.headers["Cache-Control"] = "no-store"
         return response
 
     @app.exception_handler(ApiError)
@@ -83,6 +96,22 @@ def create_app() -> FastAPI:
                 "fields": safe_errors,
             },
         )
+
+    @app.exception_handler(Exception)
+    async def handle_unexpected_error(request: Request, _exc: Exception) -> JSONResponse:
+        request_id = request.state.request_id
+        response = JSONResponse(
+            status_code=500,
+            content={
+                "code": "internal_error",
+                "message": "Internal server error",
+                "request_id": request_id,
+            },
+        )
+        response.headers["X-Request-ID"] = request_id
+        if _is_selection_request(request):
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
     app.include_router(browser_router)
     return app

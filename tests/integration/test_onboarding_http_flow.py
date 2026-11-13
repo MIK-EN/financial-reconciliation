@@ -164,12 +164,16 @@ def test_selection_on_foreign_active_or_unknown_run_is_rejected(
         )
 
         assert foreign_completed.status_code == 404
+        assert foreign_completed.headers["cache-control"] == "no-store"
         assert foreign_completed.json()["code"] == "onboarding_not_found"
         assert foreign_active.status_code == 404
+        assert foreign_active.headers["cache-control"] == "no-store"
         assert foreign_active.json()["code"] == "onboarding_not_found"
         assert own_active.status_code == 409
+        assert own_active.headers["cache-control"] == "no-store"
         assert own_active.json()["code"] == "selection_conflict"
         assert unknown.status_code == 404
+        assert unknown.headers["cache-control"] == "no-store"
         assert unknown.json()["code"] == "onboarding_not_found"
 
         restored_owner = onboarding_client.get(f"/api/v1/onboarding/{completed_state['id']}")
@@ -235,11 +239,13 @@ def test_own_expired_selection_returns_gone_and_foreign_stays_hidden(
         )
 
     assert own_expired.status_code == 410
+    assert own_expired.headers["cache-control"] == "no-store"
     assert own_expired.json()["code"] == "run_expired"
     assert own_expired.json()["message"] == "Onboarding run has expired"
     assert len(own_expired.json()["request_id"]) == 32
     assert own_expired.headers["x-request-id"] == own_expired.json()["request_id"]
     assert foreign_expired.status_code == 404
+    assert foreign_expired.headers["cache-control"] == "no-store"
     assert foreign_expired.json()["code"] == "onboarding_not_found"
 
     restored = onboarding_client.get(f"/api/v1/onboarding/{completed_state['id']}")

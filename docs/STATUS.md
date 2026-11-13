@@ -407,3 +407,8 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 - Итоговые проверки на disposable PostgreSQL 17: `pytest tests -q` — 257 passed; Ruff lint — успешно; `ruff format --check .` — 57 файлов; mypy — 23 файла без ошибок; `alembic current` — `0002_unanswered_step (head)`, `alembic check` — `No new upgrade operations detected`; `git diff --check` — чисто. `uv`-команды выполнялись эквивалентными `.venv`-вызовами: uv-кеш недоступен из песочницы. Сохраняется предсуществующее предупреждение StarletteDeprecationWarning про `TestClient`/httpx.
 - Ветка `feat/onboarding-run-flow` локальная: на момент проверки 34 коммита впереди `origin/main` (4048be3), с этой порцией — 35; не запушена, PR нет, CI для неё не запускался. Публикация — только по отдельному разрешению пользователя.
 - Ограничения: прохождение проверено через API и PostgreSQL; браузерного интерфейса, аккаунтов и claim ещё нет. Следующая задача по плану — 5 «Регистрация, вход и выход», отдельными порциями.
+
+## Коррекция no-store для selection, 2026-11-13
+
+- `PUT /selection` получает `Cache-Control: no-store` для штатных ответов, ошибок API, раннего 413 и неожиданного безопасного 500. Проверки покрывают 404/409/410/413/500; внутренние детали исключения не возвращаются.
+- RED подтвердил отсутствие заголовка на 413 и 500; после исправления полный `pytest tests -q` на disposable PostgreSQL 17 — 258 passed. Ruff lint/format, mypy и `alembic check` успешны. Единственное предупреждение — прежний `StarletteDeprecationWarning` для TestClient/httpx.
