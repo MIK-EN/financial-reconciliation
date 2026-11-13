@@ -6,6 +6,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import DBAPIError
 
 from english_for_developers.api.browser_routes import router as browser_router
 from english_for_developers.api.errors import ApiError
@@ -50,6 +51,17 @@ def create_app() -> FastAPI:
             content={
                 "code": exc.code,
                 "message": exc.message,
+                "request_id": request.state.request_id,
+            },
+        )
+
+    @app.exception_handler(DBAPIError)
+    async def handle_database_error(request: Request, _exc: DBAPIError) -> JSONResponse:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "code": "database_unavailable",
+                "message": "Database is unavailable",
                 "request_id": request.state.request_id,
             },
         )

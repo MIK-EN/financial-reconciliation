@@ -1,6 +1,9 @@
 from typing import Any
 
 import pytest
+from sqlalchemy.exc import OperationalError
+
+from english_for_developers.api.dependencies import get_db
 
 
 def _assert_api_error(response: Any, status_code: int, code: str, message: str) -> dict[str, Any]:
@@ -80,6 +83,28 @@ def test_json_body_limit_does_not_trust_content_length(client: Any) -> None:
     )
 
     _assert_api_error(response, 413, "request_too_large", "Request body is too large")
+
+
+def test_database_failure_returns_safe_service_unavailable(app: Any, client: Any) -> None:
+    def unavailable_database() -> None:
+        raise OperationalError(
+            "SELECT secret_database_value",
+            {},
+            RuntimeError("private-database-host"),
+        )
+
+    app.dependency_overrides[get_db] = unavailable_database
+
+    response = client.post(
+        "/api/v1/browser-session",
+        headers={"Origin": "http://testserver"},
+        json={},
+    )
+
+    _assert_api_error(response, 503, "database_unavailable", "Database is unavailable")
+    assert "secret_database_value" not in response.text
+    assert "private-database-host" not in response.text
+    assert "set-cookie" not in response.headers
 
 
 @pytest.mark.parametrize("endpoint", ["start", "answer", "selection"])

@@ -365,3 +365,8 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 
 - PostgreSQL integration-тест после фактического flush перехода инъецирует исключение вместо commit. Закрытие request-like Session откатывает транзакцию; свежая Session видит revision 0, исходный current step и одну незаполненную запись.
 - Mutation-проверка сначала выполняла настоящий commit и лишь затем выбрасывала то же исключение: проверка ожидаемо обнаружила revision 1. После восстановления сбоя до commit тест снова прошёл; production-код не менялся.
+
+## Онбординг 4: безопасный 503 при недоступной БД, 2026-11-13
+
+- FastAPI обрабатывает SQLAlchemy `DBAPIError` как стабильный 503 `database_unavailable` с `code/message/request_id`; SQL, адрес БД и исходное исключение не отражаются клиенту.
+- RED `OperationalError` выходил из TestClient с SQL и приватной причиной. GREEN возвращает безопасный JSON, request ID совпадает с заголовком, `Set-Cookie` отсутствует. Пункт session/rollback/503 задачи 4 закрыт; прогресс — 9 из 11.
