@@ -92,7 +92,12 @@ def _active_auth_session(db: Session, token: str | None, now: datetime) -> Brows
 
 
 def _run_owner_session(
-    db: Session, request: Request, settings: Settings, run_id: UUID, now: datetime
+    db: Session,
+    request: Request,
+    settings: Settings,
+    run_id: UUID,
+    now: datetime,
+    csrf_token: str | None = None,
 ) -> tuple[BrowserSession | None, BrowserSession | None]:
     guest = _active_session(db, request.cookies.get(settings.session_cookie_name), now)
     auth = _active_auth_session(db, request.cookies.get(settings.auth_cookie_name), now)
@@ -106,6 +111,13 @@ def _run_owner_session(
             and candidate.anonymous_session_id == guest.id
         ):
             return guest, guest
+    if guest is not None:
+        try:
+            require_csrf_token(csrf_token, guest.csrf_secret)
+        except (ValueError, TypeError):
+            pass
+        else:
+            return None, guest
     return None, auth or guest
 
 
@@ -326,7 +338,7 @@ def update_selection(
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> CompletedRunResponse:
     _require_allowed_origin(origin, settings.expected_origin)
-    owner, fallback = _run_owner_session(db, request, settings, run_id, now)
+    owner, fallback = _run_owner_session(db, request, settings, run_id, now, csrf_token)
     session = owner or fallback
     if session is None:
         raise ApiError(403, "session_unavailable", "Browser session is unavailable")

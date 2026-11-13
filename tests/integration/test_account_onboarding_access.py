@@ -188,3 +188,35 @@ def test_invalid_guest_cookie_does_not_mask_account_and_auth_cannot_answer(
     )
     assert start.status_code == answer.status_code == 403
     assert start.json()["code"] == answer.json()["code"] == "session_unavailable"
+
+
+def test_both_cookies_hide_foreign_and_unknown_with_either_valid_csrf(
+    access_client: TestClient,
+) -> None:
+    login._account(access_client)
+    access_client.cookies.clear()
+    guest_headers, _ = login.registration._complete(access_client)
+    authenticated = login._login(access_client, guest_headers)
+    assert authenticated.status_code == 200
+    auth_csrf = authenticated.json()["csrf_token"]
+    with TestClient(access_client.app, base_url="http://testserver") as foreign:
+        headers, foreign_run = login.registration._complete(foreign)
+        registered = foreign.post(
+            "/api/v1/auth/register",
+            headers=headers,
+            json={
+                "username": "foreign_reader",
+                "password": login.PASSWORD,
+                "run_id": foreign_run["id"],
+            },
+        )
+        assert registered.status_code == 201
+        for hidden in (foreign_run["id"], str(uuid4())):
+            for csrf in (guest_headers["X-CSRF-Token"], auth_csrf):
+                denied = _selection(access_client, hidden, csrf, 3)
+                assert denied.status_code == 404
+                assert denied.json()["code"] == "onboarding_not_found"
+                assert denied.headers["cache-control"] == "no-store"
+            invalid = _selection(access_client, hidden, "invalid-csrf", 3)
+            assert invalid.status_code == 403
+            assert invalid.json()["code"] == "csrf_not_allowed"
