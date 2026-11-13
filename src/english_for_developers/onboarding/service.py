@@ -301,6 +301,7 @@ def select_level(
     now: datetime,
 ) -> CompletedRun:
     """Change a completed run's user-selected level once per revision."""
+    _lock_active_browser_session(db, browser_session, now)
     run = db.scalar(
         select(OnboardingRun)
         .where(

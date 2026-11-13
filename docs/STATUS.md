@@ -355,3 +355,8 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 
 - Тот же детерминированный PostgreSQL race-тест теперь отдельно сокращает `expires_at` до текущего времени, пока answer ждёт session-row lock. После commit answer перечитывает срок, получает отказ и не меняет run или step.
 - Поведение уже обеспечивалось session-first helper. Mutation-проверка без сравнения `expires_at <= now` ошибочно приняла ответ; после восстановления оба варианта race-теста прошли.
+
+## Онбординг 4: отзыв сессии во время selection, 2026-11-13
+
+- `select_level` теперь использует тот же session-first helper до блокировки completed run. PostgreSQL race-тест удерживает session-row lock, отзывает session и подтверждает ожидание selection через `pg_blocking_pids`.
+- RED selection завершался до снятия session-lock. После исправления он перечитывает отзыв и отклоняется; `selected_level` остаётся `foundations`, revision не меняется.
