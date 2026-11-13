@@ -1,19 +1,43 @@
 from typing import Any
 
+import pytest
+from sqlalchemy.exc import OperationalError
+
+from english_for_developers.api.dependencies import get_db
+
+
+def _assert_api_error(response: Any, status_code: int, code: str, message: str) -> dict[str, Any]:
+    body = response.json()
+    assert response.status_code == status_code
+    assert body["code"] == code
+    assert body["message"] == message
+    assert len(body["request_id"]) == 32
+    assert response.headers["x-request-id"] == body["request_id"]
+    return body
+
+
+def _start_onboarding(client: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+    headers = {"Origin": "http://testserver"}
+    session = client.post("/api/v1/browser-session", headers=headers, json={}).json()
+    run = client.post(
+        "/api/v1/onboarding",
+        headers={**headers, "X-CSRF-Token": session["csrf_token"]},
+        json={},
+    ).json()
+    return session, run
+
 
 def test_missing_origin_is_rejected(client: Any) -> None:
     response = client.post("/api/v1/browser-session", json={})
 
-    assert response.status_code == 403
-    assert response.json()["detail"] == "origin not allowed"
+    _assert_api_error(response, 403, "origin_not_allowed", "Request origin is not allowed")
 
 
 def test_null_and_foreign_origin_are_rejected(client: Any) -> None:
     for origin in ("null", "https://evil.example"):
         response = client.post("/api/v1/browser-session", headers={"Origin": origin}, json={})
 
-        assert response.status_code == 403
-        assert response.json()["detail"] == "origin not allowed"
+        _assert_api_error(response, 403, "origin_not_allowed", "Request origin is not allowed")
 
 
 def test_reused_browser_session_requires_matching_csrf_token(client: Any) -> None:
@@ -29,8 +53,7 @@ def test_reused_browser_session_requires_matching_csrf_token(client: Any) -> Non
 
         response = client.post("/api/v1/browser-session", headers=headers, json={})
 
-        assert response.status_code == 403
-        assert response.json()["detail"] == "csrf token not allowed"
+        _assert_api_error(response, 403, "csrf_not_allowed", "CSRF token is invalid")
 
 
 def test_extra_fields_are_rejected_without_echoing_secret_input(client: Any) -> None:
@@ -41,13 +64,16 @@ def test_extra_fields_are_rejected_without_echoing_secret_input(client: Any) -> 
     )
 
     assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
+    assert response.json()["message"] == "Request validation failed"
+    assert len(response.json()["request_id"]) == 32
     assert "do-not-echo" not in response.text
 
 
 def test_json_body_limit_does_not_trust_content_length(client: Any) -> None:
     oversized = b'{"padding":"' + (b"x" * (16 * 1024)) + b'"}'
-    response = client.post(
-        "/api/v1/browser-session",
+    response = client.put(
+        "/api/v1/onboarding/00000000-0000-0000-0000-000000000000/selection",
         headers={
             "Origin": "http://testserver",
             "Content-Type": "application/json",
@@ -56,5 +82,97 @@ def test_json_body_limit_does_not_trust_content_length(client: Any) -> None:
         content=oversized,
     )
 
-    assert response.status_code == 413
-    assert response.json() == {"detail": "request body too large"}
+    _assert_api_error(response, 413, "request_too_large", "Request body is too large")
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_unexpected_selection_error_still_disables_caching(app: Any) -> None:
+    from fastapi.testclient import TestClient
+
+    def unexpected_database_error() -> None:
+        raise RuntimeError("private failure details")
+
+    app.dependency_overrides[get_db] = unexpected_database_error
+
+    with TestClient(app, raise_server_exceptions=False) as error_client:
+        response = error_client.put(
+            "/api/v1/onboarding/00000000-0000-0000-0000-000000000000/selection",
+            headers={"Origin": "http://testserver"},
+            json={"selected_level": "basic_docs", "expected_revision": 1},
+        )
+
+    assert response.status_code == 500
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["code"] == "internal_error"
+    assert response.headers["x-request-id"] == response.json()["request_id"]
+    assert "private failure details" not in response.text
+
+
+def test_database_failure_returns_safe_service_unavailable(app: Any, client: Any) -> None:
+    def unavailable_database() -> None:
+        raise OperationalError(
+            "SELECT secret_database_value",
+            {},
+            RuntimeError("private-database-host"),
+        )
+
+    app.dependency_overrides[get_db] = unavailable_database
+
+    response = client.post(
+        "/api/v1/browser-session",
+        headers={"Origin": "http://testserver"},
+        json={},
+    )
+
+    _assert_api_error(response, 503, "database_unavailable", "Database is unavailable")
+    assert "secret_database_value" not in response.text
+    assert "private-database-host" not in response.text
+    assert "set-cookie" not in response.headers
+
+
+@pytest.mark.parametrize("endpoint", ["start", "answer", "selection"])
+@pytest.mark.parametrize(
+    ("security_case", "expected_code", "expected_message"),
+    [
+        ("missing_origin", "origin_not_allowed", "Request origin is not allowed"),
+        ("wrong_csrf", "csrf_not_allowed", "CSRF token is invalid"),
+    ],
+)
+def test_onboarding_mutations_return_stable_security_errors(
+    client: Any,
+    endpoint: str,
+    security_case: str,
+    expected_code: str,
+    expected_message: str,
+) -> None:
+    session, run = _start_onboarding(client)
+    headers = {
+        "Origin": "http://testserver",
+        "X-CSRF-Token": session["csrf_token"],
+    }
+    if security_case == "missing_origin":
+        del headers["Origin"]
+    else:
+        headers["X-CSRF-Token"] = "wrong-token"
+
+    if endpoint == "start":
+        response = client.post("/api/v1/onboarding", headers=headers, json={})
+    elif endpoint == "answer":
+        response = client.post(
+            f"/api/v1/onboarding/{run['id']}/answers",
+            headers=headers,
+            json={
+                "step_id": run["step"]["id"],
+                "mode": "all_known",
+                "word_ids": [],
+                "content_version": run["bundle_version"],
+            },
+        )
+    else:
+        response = client.put(
+            f"/api/v1/onboarding/{run['id']}/selection",
+            headers=headers,
+            json={"selected_level": "foundations", "expected_revision": 0},
+        )
+
+    _assert_api_error(response, 403, expected_code, expected_message)
