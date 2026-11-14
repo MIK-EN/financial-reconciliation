@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Header, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from english_for_developers.accounts.claim import claim_run
 from english_for_developers.accounts.sessions import (
     hash_session_token,
     issue_csrf_secret,
@@ -24,6 +25,7 @@ from english_for_developers.api.schemas import (
     AnswerRequest,
     BrowserContextResponse,
     BrowserSessionResponse,
+    ClaimRequest,
     CompletedRunResponse,
     EmptyBody,
     SegmentResponse,
@@ -324,6 +326,32 @@ def create_answer(
         raise ApiError(409, "answer_conflict", "Answer cannot be accepted") from exc
     response.headers["Cache-Control"] = "no-store"
     return _run_response(run)
+
+
+@router.post("/onboarding/{run_id}/claim", response_model=CompletedRunResponse)
+def claim_onboarding_run(
+    run_id: UUID,
+    body: ClaimRequest,
+    response: Response,
+    request: Request,
+    origin: str | None = Header(default=None),
+    csrf_token: str | None = Header(default=None, alias="X-CSRF-Token"),
+    db: Session = Depends(get_db),  # noqa: B008
+    now: datetime = Depends(get_now),  # noqa: B008
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> CompletedRunResponse:
+    _require_allowed_origin(origin, settings.expected_origin)
+    run = claim_run(
+        db,
+        request.cookies.get(settings.auth_cookie_name),
+        request.cookies.get(settings.session_cookie_name),
+        run_id,
+        body.expected_revision,
+        csrf_token,
+        now,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return _completed_run_response(run)
 
 
 @router.put("/onboarding/{run_id}/selection", response_model=CompletedRunResponse)
