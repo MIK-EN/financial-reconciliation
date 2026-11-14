@@ -30,12 +30,7 @@ def _require_sessions(
         require_csrf_token(csrf_token, auth.csrf_secret)
     except (ValueError, TypeError) as exc:
         raise ApiError(403, "csrf_not_allowed", "CSRF token is invalid") from exc
-    if (
-        guest is None
-        or guest.kind != "anonymous"
-        or guest.revoked_at is not None
-        or guest.expires_at <= now
-    ):
+    if guest is None or guest.kind != "anonymous" or guest.expires_at <= now:
         raise ApiError(403, "session_unavailable", "Anonymous session is unavailable")
 
 
@@ -82,8 +77,16 @@ def claim_run(
         )
         now = datetime.now(UTC)
         _require_sessions(auth, guest, csrf_token, now)
-        if run is None or run.anonymous_session_id != guest.id or run.user_id is not None:
+        if (
+            run is None
+            or run.anonymous_session_id != guest.id
+            or run.user_id not in (None, user.id)
+        ):
             raise ApiError(404, "onboarding_not_found", "Onboarding resource was not found")
+        if run.user_id == user.id:
+            return _completed_run(db, run)
+        if guest.revoked_at is not None:
+            raise ApiError(403, "session_unavailable", "Anonymous session is unavailable")
         if run.expires_at <= now:
             raise ApiError(410, "run_expired", "Onboarding run has expired")
         if run.status != "completed" or run.revision != expected_revision:

@@ -168,3 +168,148 @@ def test_rejected_claim_preserves_all_account_session_and_run_rows(
     with Session(test_engine) as db:
         assert login.registration._snapshot(db) == before
     assert response.headers.get("cache-control") == "no-store"
+
+
+@pytest.mark.parametrize("later_change", ["none", "new_claim", "selection"])
+def test_claim_retry_after_committed_response_loss_preserves_current_state(
+    claim_client: TestClient, test_engine: Engine, later_change: str
+) -> None:
+    account = login._account(claim_client)
+    claim_client.cookies.clear()
+    guest_headers, state = login.registration._complete(claim_client)
+    guest_token = claim_client.cookies["eds_session_dev"]
+    logged_in = login._login(claim_client, guest_headers)
+    assert logged_in.status_code == 200
+    headers = {**guest_headers, "X-CSRF-Token": logged_in.json()["csrf_token"]}
+    path = f"/api/v1/onboarding/{state['id']}/claim"
+    payload = {"expected_revision": state["revision"]}
+    first = claim_client.post(path, headers=headers, json=payload)
+    assert first.status_code == 200
+    expected = first.json()
+    assert expected == {**state, "revision": state["revision"] + 1, "saved_to_account": True}
+    # A separate connection proves the first transaction committed before retry.
+    with Session(test_engine) as db:
+        run = db.get(OnboardingRun, UUID(state["id"]))
+        guest = db.scalar(
+            select(BrowserSession).where(
+                BrowserSession.token_hash == hash_session_token(guest_token)
+            )
+        )
+        assert run is not None and guest is not None
+        assert run.user_id == UUID(account["user_id"])
+        assert run.claimed_at is not None and guest.revoked_at == run.claimed_at
+        assert run.revision == state["revision"] + 1
+    current_id = state["id"]
+    saved_ids = {account["current_run_id"], state["id"]}
+    if later_change == "new_claim":
+        claim_client.cookies.delete("eds_session_dev")
+        new_headers, new_run = login.registration._complete(claim_client)
+        newer = claim_client.post(
+            f"/api/v1/onboarding/{new_run['id']}/claim",
+            headers={**new_headers, "X-CSRF-Token": headers["X-CSRF-Token"]},
+            json={"expected_revision": new_run["revision"]},
+        )
+        assert newer.status_code == 200
+        current_id = new_run["id"]
+        saved_ids.add(current_id)
+        claim_client.cookies.delete("eds_session_dev")
+        claim_client.cookies.set("eds_session_dev", guest_token)
+    if later_change == "selection":
+        selected = "basic_docs" if state["selected_level"] != "basic_docs" else "foundations"
+        changed = claim_client.put(
+            f"/api/v1/onboarding/{state['id']}/selection",
+            headers=headers,
+            json={"selected_level": selected, "expected_revision": expected["revision"]},
+        )
+        assert changed.status_code == 200
+        expected = changed.json()
+        assert expected["revision"] == state["revision"] + 2
+    with Session(test_engine) as db:
+        before = login.registration._snapshot(db)
+    for _ in range(2):
+        retry = claim_client.post(path, headers=headers, json=payload)
+        assert retry.status_code == 200, retry.text
+        assert retry.json() == expected
+        assert retry.headers["cache-control"] == "no-store"
+        assert "set-cookie" not in retry.headers
+        with Session(test_engine) as db:
+            assert login.registration._snapshot(db) == before
+        context = claim_client.get("/api/v1/context").json()
+        assert context["account"]["current_run_id"] == current_id
+        assert set(context["saved_run_ids"]) == saved_ids
+
+
+@pytest.mark.parametrize(
+    "case,status,code",
+    [
+        ("missing_auth", 401, "authentication_required"),
+        ("expired_auth", 401, "authentication_required"),
+        ("revoked_auth", 401, "authentication_required"),
+        ("csrf", 403, "csrf_not_allowed"),
+        ("missing_guest", 403, "session_unavailable"),
+        ("unknown_guest", 403, "session_unavailable"),
+        ("foreign_guest", 404, "onboarding_not_found"),
+        ("expired_guest", 403, "session_unavailable"),
+        ("foreign_owner", 404, "onboarding_not_found"),
+    ],
+)
+def test_claim_retry_still_requires_original_guest_and_valid_auth(
+    claim_client: TestClient, test_engine: Engine, case: str, status: int, code: str
+) -> None:
+    login._account(claim_client)
+    claim_client.cookies.clear()
+    guest_headers, state = login.registration._complete(claim_client)
+    logged_in = login._login(claim_client, guest_headers)
+    assert logged_in.status_code == 200
+    headers = {**guest_headers, "X-CSRF-Token": logged_in.json()["csrf_token"]}
+    path = f"/api/v1/onboarding/{state['id']}/claim"
+    payload = {"expected_revision": state["revision"]}
+    assert claim_client.post(path, headers=headers, json=payload).status_code == 200
+    if case in {"missing_auth", "missing_guest"}:
+        claim_client.cookies.delete("eds_auth_dev" if case == "missing_auth" else "eds_session_dev")
+    if case == "unknown_guest":
+        claim_client.cookies.delete("eds_session_dev")
+        claim_client.cookies.set("eds_session_dev", "unknown")
+    if case == "foreign_guest":
+        claim_client.cookies.delete("eds_session_dev")
+        login.registration.flow._mutation_headers(claim_client)
+    if case == "csrf":
+        headers["X-CSRF-Token"] = "invalid"
+    with Session(test_engine) as db:
+        if case in {"expired_auth", "revoked_auth", "expired_guest"}:
+            cookie = "eds_session_dev" if case == "expired_guest" else "eds_auth_dev"
+            session = db.scalar(
+                select(BrowserSession).where(
+                    BrowserSession.token_hash == hash_session_token(claim_client.cookies[cookie])
+                )
+            )
+            assert session is not None
+            if case == "revoked_auth":
+                session.revoked_at = datetime.now(UTC)
+            else:
+                session.expires_at = datetime.now(UTC) - timedelta(days=1)
+        if case == "foreign_owner":
+            owner = User(
+                id=uuid4(),
+                username="other_reader",
+                password_hash="unused",
+                created_at=datetime.now(UTC),
+            )
+            db.add(owner)
+            db.flush()
+            auth = db.scalar(
+                select(BrowserSession).where(
+                    BrowserSession.token_hash
+                    == hash_session_token(claim_client.cookies["eds_auth_dev"])
+                )
+            )
+            assert auth is not None
+            auth.user_id = owner.id
+        db.commit()
+        before = login.registration._snapshot(db)
+    response = claim_client.post(path, headers=headers, json=payload)
+    assert response.status_code == status and response.json()["code"] == code
+    assert response.headers["cache-control"] == "no-store"
+    assert "set-cookie" not in response.headers
+    with Session(test_engine) as db:
+        assert login.registration._snapshot(db) == before
