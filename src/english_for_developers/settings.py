@@ -22,3 +22,7 @@ class Settings:
     @property
     def session_cookie_name(self) -> str:
         return "__Host-eds_session" if self.environment == "production" else "eds_session_dev"
+
+    @property
+    def auth_cookie_name(self) -> str:
+        return "__Host-eds_auth" if self.environment == "production" else "eds_auth_dev"

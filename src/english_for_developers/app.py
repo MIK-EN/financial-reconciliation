@@ -8,18 +8,19 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DBAPIError
 
+from english_for_developers.api.auth_routes import router as auth_router
 from english_for_developers.api.browser_routes import router as browser_router
 from english_for_developers.api.errors import ApiError
 
 MAX_JSON_BODY_BYTES = 16 * 1024
 
 
-def _is_selection_request(request: Request) -> bool:
+def _requires_no_store(request: Request) -> bool:
     return (
         request.method == "PUT"
         and request.url.path.startswith("/api/v1/onboarding/")
         and request.url.path.endswith("/selection")
-    )
+    ) or request.url.path in {"/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/logout"}
 
 
 def create_app() -> FastAPI:
@@ -32,7 +33,7 @@ def create_app() -> FastAPI:
     ) -> Response:
         request_id = uuid4().hex
         request.state.request_id = request_id
-        is_selection_request = _is_selection_request(request)
+        disable_caching = _requires_no_store(request)
         content_type = request.headers.get("content-type", "")
         if request.method in {"POST", "PUT", "PATCH"} and content_type.startswith(
             "application/json"
@@ -48,12 +49,12 @@ def create_app() -> FastAPI:
                     },
                 )
                 error_response.headers["X-Request-ID"] = request_id
-                if is_selection_request:
+                if disable_caching:
                     error_response.headers["Cache-Control"] = "no-store"
                 return error_response
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
-        if is_selection_request:
+        if disable_caching:
             response.headers["Cache-Control"] = "no-store"
         return response
 
@@ -109,9 +110,10 @@ def create_app() -> FastAPI:
             },
         )
         response.headers["X-Request-ID"] = request_id
-        if _is_selection_request(request):
+        if _requires_no_store(request):
             response.headers["Cache-Control"] = "no-store"
         return response
 
+    app.include_router(auth_router)
     app.include_router(browser_router)
     return app
