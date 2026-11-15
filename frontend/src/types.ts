@@ -132,13 +132,17 @@ export function parseBrowserSession(value: unknown): BrowserSession {
   };
 }
 
+export function isLevel(value: unknown): value is Level {
+  return (
+    value === "foundations" ||
+    value === "basic_docs" ||
+    value === "confident_reading" ||
+    value === "complex_texts"
+  );
+}
+
 function parseLevel(value: unknown, label: string): Level {
-  if (
-    value !== "foundations" &&
-    value !== "basic_docs" &&
-    value !== "confident_reading" &&
-    value !== "complex_texts"
-  ) {
+  if (!isLevel(value)) {
     throw new Error(`${label} is not a level`);
   }
   return value;

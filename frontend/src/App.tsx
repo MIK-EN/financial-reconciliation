@@ -7,12 +7,13 @@ import {
   getRun,
   startRun,
   submitAnswer,
+  updateSelection,
 } from "./api";
 import { ResultScreen } from "./components/ResultScreen";
 import { StartScreen } from "./components/StartScreen";
 import { TextStep } from "./components/TextStep";
 import { clearDraft } from "./draft";
-import type { RunState } from "./types";
+import type { Level, RunState } from "./types";
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiRequestError && error.status === 503) {
@@ -115,6 +116,35 @@ export function App() {
     }
   }
 
+  async function handleSelection(level: Level) {
+    if (run?.status !== "completed" || csrfToken === null) return;
+    const submittedRun = run;
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await updateSelection(
+        submittedRun.id,
+        csrfToken,
+        level,
+        submittedRun.revision,
+      );
+      setRun((current) => keepNewestRun(current, next));
+    } catch (caught) {
+      if (caught instanceof ApiRequestError && caught.status === 409) {
+        try {
+          const restored = await getRun(submittedRun.id);
+          setRun((current) => keepNewestRun(current, restored));
+        } catch (restoreError) {
+          setError(errorMessage(restoreError));
+        }
+      } else {
+        setError(errorMessage(caught));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <main className="screen loading-screen" aria-live="polite">
@@ -136,5 +166,12 @@ export function App() {
       />
     );
   }
-  return <ResultScreen run={run} />;
+  return (
+    <ResultScreen
+      run={run}
+      busy={busy}
+      error={error}
+      onSelectLevel={(level) => void handleSelection(level)}
+    />
+  );
 }
