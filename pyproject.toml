@@ -12,6 +12,7 @@ dependencies = [
     "psycopg[binary]>=3.2,<4",
     "sqlalchemy>=2.0,<3",
     "pwdlib[argon2]>=0.3.1,<0.4",
+    "uvicorn>=0.54,<0.55",
 ]
 
 [build-system]
