@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { loadDraft, saveDraft } from "../draft";
 import type { ActiveRun } from "../types";
 
 interface TextStepProps {
@@ -10,16 +11,15 @@ interface TextStepProps {
 }
 
 export function TextStep({ run, busy, error, onSubmit }: TextStepProps) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(loadDraft(run)));
 
   function toggleWord(wordId: string) {
     if (busy) return;
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(wordId)) next.delete(wordId);
-      else next.add(wordId);
-      return next;
-    });
+    const next = new Set(selected);
+    if (next.has(wordId)) next.delete(wordId);
+    else next.add(wordId);
+    setSelected(next);
+    saveDraft(run, [...next]);
   }
 
   const selectedIds = [...selected].sort();

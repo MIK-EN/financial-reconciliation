@@ -11,6 +11,7 @@ import {
 import { ResultScreen } from "./components/ResultScreen";
 import { StartScreen } from "./components/StartScreen";
 import { TextStep } from "./components/TextStep";
+import { clearDraft } from "./draft";
 import type { RunState } from "./types";
 
 function errorMessage(error: unknown): string {
@@ -93,11 +94,15 @@ export function App() {
         word_ids: wordIds,
         content_version: submittedRun.bundle_version,
       });
+      clearDraft(submittedRun);
       setRun((current) => keepNewestRun(current, next));
     } catch (caught) {
       if (caught instanceof ApiRequestError && caught.status === 409) {
         try {
           const restored = await getRun(submittedRun.id);
+          if (restored.status === "completed" || restored.step.id !== submittedRun.step.id) {
+            clearDraft(submittedRun);
+          }
           setRun((current) => keepNewestRun(current, restored));
         } catch (restoreError) {
           setError(errorMessage(restoreError));
