@@ -13,6 +13,14 @@ async function completeSimplifiedRoute(page: Page) {
   ).toBeVisible();
 }
 
+async function registerCompletedResult(page: Page, username: string) {
+  await page.getByRole("button", { name: "Сохранить результат" }).click();
+  await page.getByLabel("Логин").fill(username);
+  await page.getByLabel("Пароль").fill("correct horse 123");
+  await page.getByRole("button", { name: "Создать аккаунт" }).click();
+  await expect(page.getByText(`Результат сохранён в аккаунте ${username}`)).toBeVisible();
+}
+
 test("guest completes the simplified onboarding route", async ({ page }) => {
   await page.goto("/");
 
@@ -76,18 +84,47 @@ test("guest can dismiss the account offer", async ({ page }) => {
 test("registration saves and restores the completed result", async ({ page }) => {
   const username = `e2e_${Date.now()}`;
   await completeSimplifiedRoute(page);
-  await page.getByRole("button", { name: "Сохранить результат" }).click();
-
-  await page.getByLabel("Логин").fill(username);
-  await page.getByLabel("Пароль").fill("correct horse 123");
-  await page.getByRole("button", { name: "Создать аккаунт" }).click();
-
-  await expect(page.getByText(`Результат сохранён в аккаунте ${username}`)).toBeVisible();
+  await registerCompletedResult(page, username);
   await page.reload();
   await expect(page.getByText(`Результат сохранён в аккаунте ${username}`)).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Рекомендуем начать с: Основы" }),
   ).toBeVisible();
+});
+
+test("login restores a result after the auth cookie is lost", async ({ context, page }) => {
+  const username = `e2e_${Date.now()}`;
+  await completeSimplifiedRoute(page);
+  await registerCompletedResult(page, username);
+
+  await context.clearCookies({ name: "eds_auth_dev" });
+  await page.reload();
+  await page.getByRole("button", { name: "Войти" }).click();
+  await page.getByLabel("Логин").fill(username);
+  await page.getByLabel("Пароль").fill("correct horse 123");
+  await page.getByRole("button", { name: "Войти", exact: true }).click();
+
+  await expect(page.getByText(`Результат сохранён в аккаунте ${username}`)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Рекомендуем начать с: Основы" }),
+  ).toBeVisible();
+});
+
+test("login keeps a guest result separate until explicit claim", async ({ page }) => {
+  const username = `e2e_${Date.now()}`;
+  await completeSimplifiedRoute(page);
+  await registerCompletedResult(page, username);
+  await page.getByRole("button", { name: "Выйти" }).click();
+
+  await completeSimplifiedRoute(page);
+  await page.getByRole("button", { name: "Войти" }).click();
+  await page.getByLabel("Логин").fill(username);
+  await page.getByLabel("Пароль").fill("correct horse 123");
+  await page.getByRole("button", { name: "Войти", exact: true }).click();
+
+  await expect(page.getByText(`Вы вошли как ${username}`)).toBeVisible();
+  await page.getByRole("button", { name: "Сохранить этот результат в аккаунте" }).click();
+  await expect(page.getByText(`Результат сохранён в аккаунте ${username}`)).toBeVisible();
 });
 
 test("draft selection survives a reload", async ({ page }) => {

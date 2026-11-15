@@ -2,9 +2,10 @@ interface StartScreenProps {
   busy: boolean;
   error: string | null;
   onStart: () => void;
+  onLogin: () => void;
 }
 
-export function StartScreen({ busy, error, onStart }: StartScreenProps) {
+export function StartScreen({ busy, error, onStart, onLogin }: StartScreenProps) {
   return (
     <main className="screen start-screen">
       <p className="eyebrow">English for Developers</p>
@@ -21,6 +22,9 @@ export function StartScreen({ busy, error, onStart }: StartScreenProps) {
       )}
       <button className="primary-action" type="button" disabled={busy} onClick={onStart}>
         {busy ? "Начинаем…" : "Начать"}
+      </button>
+      <button className="secondary-action" type="button" disabled={busy} onClick={onLogin}>
+        Войти
       </button>
     </main>
   );

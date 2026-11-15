@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 
 import {
   ApiRequestError,
+  claimRun,
   createBrowserSession,
   getContext,
   getRun,
+  login as loginAccount,
+  logout as logoutAccount,
   register as registerAccount,
   startRun,
   submitAnswer,
@@ -178,6 +181,63 @@ export function App() {
     }
   }
 
+  async function handleLogin(username: string, password: string) {
+    setBusy(true);
+    setAccountError(null);
+    try {
+      let token = guestCsrfToken;
+      if (token === null) {
+        const session = await createBrowserSession();
+        token = session.csrf_token;
+        setGuestCsrfToken(token);
+      }
+      const loggedIn = await loginAccount(token, { username, password });
+      setAccount(loggedIn);
+      setAccountMode(null);
+      if (run === null && loggedIn.current_run_id !== null) {
+        const restored = await getRun(loggedIn.current_run_id);
+        setRun((current) => keepNewestRun(current, restored));
+      }
+    } catch (caught) {
+      setAccountError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleLogout() {
+    if (account === null) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await logoutAccount(account.csrf_token);
+      setAccount(null);
+      setAccountMode(null);
+      if (run?.status === "completed" && run.saved_to_account) setRun(null);
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleClaim() {
+    if (run?.status !== "completed" || account === null || run.saved_to_account) return;
+    const guestRun = run;
+    setBusy(true);
+    setError(null);
+    try {
+      const saved = await claimRun(guestRun.id, account.csrf_token, guestRun.revision);
+      setRun((current) => keepNewestRun(current, saved));
+      setAccount({ ...account, current_run_id: guestRun.id });
+      setGuestCsrfToken(null);
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <main className="screen loading-screen" aria-live="polite">
@@ -186,7 +246,28 @@ export function App() {
     );
   }
   if (run === null) {
-    return <StartScreen busy={busy} error={error} onStart={() => void handleStart()} />;
+    if (accountMode === "login") {
+      return (
+        <AccountForm
+          mode="login"
+          busy={busy}
+          error={accountError}
+          onSubmit={handleLogin}
+          onCancel={() => setAccountMode(null)}
+        />
+      );
+    }
+    return (
+      <StartScreen
+        busy={busy}
+        error={error}
+        onStart={() => void handleStart()}
+        onLogin={() => {
+          setAccountError(null);
+          setAccountMode("login");
+        }}
+      />
+    );
   }
   if (run.status === "active") {
     return (
@@ -206,12 +287,18 @@ export function App() {
         busy={busy}
         error={error}
         account={account}
-        accountOfferDismissed={accountOfferDismissed}
+        accountOfferDismissed={accountOfferDismissed || accountMode !== null}
         onSelectLevel={(level) => void handleSelection(level)}
         onRegister={() => {
           setAccountError(null);
           setAccountMode("register");
         }}
+        onLogin={() => {
+          setAccountError(null);
+          setAccountMode("login");
+        }}
+        onLogout={() => void handleLogout()}
+        onClaim={() => void handleClaim()}
         onDismissAccountOffer={() => {
           setAccountOfferDismissed(true);
           setAccountMode(null);
@@ -222,7 +309,7 @@ export function App() {
           mode={accountMode}
           busy={busy}
           error={accountError}
-          onSubmit={handleRegister}
+          onSubmit={accountMode === "register" ? handleRegister : handleLogin}
           onCancel={() => setAccountMode(null)}
         />
       )}

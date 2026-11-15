@@ -15,6 +15,9 @@ interface ResultScreenProps {
   accountOfferDismissed: boolean;
   onSelectLevel: (level: Level) => void;
   onRegister: () => void;
+  onLogin: () => void;
+  onLogout: () => void;
+  onClaim: () => void;
   onDismissAccountOffer: () => void;
 }
 
@@ -26,6 +29,9 @@ export function ResultScreen({
   accountOfferDismissed,
   onSelectLevel,
   onRegister,
+  onLogin,
+  onLogout,
+  onClaim,
   onDismissAccountOffer,
 }: ResultScreenProps) {
   return (
@@ -60,9 +66,27 @@ export function ResultScreen({
         </p>
       )}
       {run.saved_to_account && account !== null ? (
-        <p className="message message-success">
-          Результат сохранён в аккаунте {account.username}
-        </p>
+        <section className="account-status">
+          <p className="message message-success">
+            Результат сохранён в аккаунте {account.username}
+          </p>
+          <button className="text-action" type="button" disabled={busy} onClick={onLogout}>
+            Выйти
+          </button>
+        </section>
+      ) : account !== null ? (
+        <section className="account-status">
+          <p>Вы вошли как {account.username}</p>
+          <p>Гостевой результат останется отдельным, пока вы явно его не сохраните.</p>
+          <div className="actions">
+            <button className="primary-action" type="button" disabled={busy} onClick={onClaim}>
+              Сохранить этот результат в аккаунте
+            </button>
+            <button className="text-action" type="button" disabled={busy} onClick={onLogout}>
+              Выйти
+            </button>
+          </div>
+        </section>
       ) : account === null && !accountOfferDismissed ? (
         <section className="account-offer" aria-labelledby="account-offer-title">
           <h2 id="account-offer-title">Сохранить результат?</h2>
@@ -70,6 +94,9 @@ export function ResultScreen({
           <div className="actions">
             <button className="primary-action" type="button" onClick={onRegister}>
               Сохранить результат
+            </button>
+            <button className="secondary-action" type="button" onClick={onLogin}>
+              Войти
             </button>
             <button className="text-action" type="button" onClick={onDismissAccountOffer}>
               Пока не сейчас
