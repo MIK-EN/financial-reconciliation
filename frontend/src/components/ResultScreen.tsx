@@ -1,4 +1,4 @@
-import { type CompletedRun, type Level, isLevel } from "../types";
+import { type AccountContext, type CompletedRun, type Level, isLevel } from "../types";
 
 const levelNames: Record<Level, string> = {
   foundations: "Основы",
@@ -11,10 +11,23 @@ interface ResultScreenProps {
   run: CompletedRun;
   busy: boolean;
   error: string | null;
+  account: AccountContext | null;
+  accountOfferDismissed: boolean;
   onSelectLevel: (level: Level) => void;
+  onRegister: () => void;
+  onDismissAccountOffer: () => void;
 }
 
-export function ResultScreen({ run, busy, error, onSelectLevel }: ResultScreenProps) {
+export function ResultScreen({
+  run,
+  busy,
+  error,
+  account,
+  accountOfferDismissed,
+  onSelectLevel,
+  onRegister,
+  onDismissAccountOffer,
+}: ResultScreenProps) {
   return (
     <main className="screen result-screen">
       <p className="eyebrow">Результат</p>
@@ -46,6 +59,24 @@ export function ResultScreen({ run, busy, error, onSelectLevel }: ResultScreenPr
           {error}
         </p>
       )}
+      {run.saved_to_account && account !== null ? (
+        <p className="message message-success">
+          Результат сохранён в аккаунте {account.username}
+        </p>
+      ) : account === null && !accountOfferDismissed ? (
+        <section className="account-offer" aria-labelledby="account-offer-title">
+          <h2 id="account-offer-title">Сохранить результат?</h2>
+          <p>Аккаунт позволит открыть этот результат после нового входа.</p>
+          <div className="actions">
+            <button className="primary-action" type="button" onClick={onRegister}>
+              Сохранить результат
+            </button>
+            <button className="text-action" type="button" onClick={onDismissAccountOffer}>
+              Пока не сейчас
+            </button>
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

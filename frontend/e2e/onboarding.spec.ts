@@ -1,4 +1,17 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
+
+async function completeSimplifiedRoute(page: Page) {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Начать" }).click();
+  for (const word of ["file", "create", "new"]) {
+    await page.getByRole("button", { name: word, exact: true }).first().click();
+  }
+  await page.getByRole("button", { name: "Продолжить" }).click();
+  await page.getByRole("button", { name: "Все слова знакомы" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Рекомендуем начать с: Основы" }),
+  ).toBeVisible();
+}
 
 test("guest completes the simplified onboarding route", async ({ page }) => {
   await page.goto("/");
@@ -37,19 +50,41 @@ test("guest completes the simplified onboarding route", async ({ page }) => {
 });
 
 test("guest changes the selected starting level", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
-  for (const word of ["file", "create", "new"]) {
-    await page.getByRole("button", { name: word, exact: true }).first().click();
-  }
-  await page.getByRole("button", { name: "Продолжить" }).click();
-  await page.getByRole("button", { name: "Все слова знакомы" }).click();
+  await completeSimplifiedRoute(page);
 
   const level = page.getByRole("combobox", { name: "Выбранная сложность" });
   await expect(level).toHaveValue("foundations");
   await level.selectOption("basic_docs");
   await expect(level).toHaveValue("basic_docs");
   await expect(page.getByText("Выбрано: Базовая документация")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Рекомендуем начать с: Основы" }),
+  ).toBeVisible();
+});
+
+test("guest can dismiss the account offer", async ({ page }) => {
+  await completeSimplifiedRoute(page);
+
+  await page.getByRole("button", { name: "Пока не сейчас" }).click();
+
+  await expect(page.getByRole("button", { name: "Сохранить результат" })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Рекомендуем начать с: Основы" }),
+  ).toBeVisible();
+});
+
+test("registration saves and restores the completed result", async ({ page }) => {
+  const username = `e2e_${Date.now()}`;
+  await completeSimplifiedRoute(page);
+  await page.getByRole("button", { name: "Сохранить результат" }).click();
+
+  await page.getByLabel("Логин").fill(username);
+  await page.getByLabel("Пароль").fill("correct horse 123");
+  await page.getByRole("button", { name: "Создать аккаунт" }).click();
+
+  await expect(page.getByText(`Результат сохранён в аккаунте ${username}`)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText(`Результат сохранён в аккаунте ${username}`)).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Рекомендуем начать с: Основы" }),
   ).toBeVisible();
