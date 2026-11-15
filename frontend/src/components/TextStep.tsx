@@ -48,6 +48,9 @@ export function TextStep({ run, busy, error, onSubmit }: TextStepProps) {
               onClick={() => toggleWord(wordId)}
             >
               {segment.text}
+              <span className="selection-mark" aria-hidden="true">
+                {selected.has(wordId) ? " ✓" : ""}
+              </span>
             </button>
           );
         })}

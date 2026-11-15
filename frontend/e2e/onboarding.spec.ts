@@ -214,3 +214,21 @@ test("conflict reloads the server-authoritative step", async ({ page }) => {
   await expect(page.getByText("Текст 2", { exact: true })).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
+
+test("mobile guest can start and select a word with the keyboard", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Начать" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  const firstWord = page.getByRole("button", { name: "You", exact: true });
+  await firstWord.focus();
+  await page.keyboard.press("Space");
+
+  await expect(firstWord).toHaveAttribute("aria-pressed", "true");
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(hasHorizontalOverflow).toBe(false);
+});
