@@ -57,6 +57,20 @@ test("guest completes the simplified onboarding route", async ({ page }) => {
   await expect(page.getByRole("link", { name: /урок/i })).toHaveCount(0);
 });
 
+test("guest completes the four-text route", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Начать" }).click();
+
+  for (const ordinal of [1, 2, 3, 4]) {
+    await expect(page.getByText(`Текст ${ordinal}`, { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Все слова знакомы" }).click();
+  }
+
+  await expect(
+    page.getByRole("heading", { name: "Рекомендуем начать с: Сложные тексты" }),
+  ).toBeVisible();
+});
+
 test("guest changes the selected starting level", async ({ page }) => {
   await completeSimplifiedRoute(page);
 
