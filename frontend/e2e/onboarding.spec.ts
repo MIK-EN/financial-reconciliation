@@ -71,6 +71,52 @@ test("guest completes the four-text route", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("guest completes the simplified difficult route", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Начать" }).click();
+
+  for (const word of ["file", "create", "new"]) {
+    await page.getByRole("button", { name: word, exact: true }).first().click();
+  }
+  await page.getByRole("button", { name: "Продолжить" }).click();
+
+  await expect(page.getByText("Текст 2", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await page.getByRole("button", { name: "Read", exact: true }).click();
+  await page.getByRole("button", { name: "Продолжить" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Рекомендуем начать с: Основы" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Даже в самом коротком тексте осталось несколько незнакомых слов."),
+  ).toBeVisible();
+});
+
+test("guest can deselect a repeated word before submitting", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Начать" }).click();
+
+  const fileWords = page.getByRole("button", { name: "file", exact: true });
+  await fileWords.first().click();
+  await expect(fileWords.nth(0)).toHaveAttribute("aria-pressed", "true");
+  await expect(fileWords.nth(1)).toHaveAttribute("aria-pressed", "true");
+
+  await fileWords.first().click();
+  await expect(fileWords.nth(0)).toHaveAttribute("aria-pressed", "false");
+  await expect(fileWords.nth(1)).toHaveAttribute("aria-pressed", "false");
+
+  await page.getByRole("button", { name: "create", exact: true }).click();
+  await page.getByRole("button", { name: "new", exact: true }).click();
+  await page.getByRole("button", { name: "Продолжить" }).click();
+
+  // Deselecting "file" leaves only 2 unique marked words out of 14, which is
+  // accessible for the start text, so the next step is "installation", not
+  // the simplified fallback used by the other tests.
+  await expect(page.getByText("Текст 2", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Before you install the application/)).toBeVisible();
+});
+
 test("guest changes the selected starting level", async ({ page }) => {
   await completeSimplifiedRoute(page);
 
