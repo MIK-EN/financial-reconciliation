@@ -1,13 +1,27 @@
 """Safe structured request logging without request or response payloads."""
 
 import logging
+import sys
 from time import perf_counter
 
 from fastapi import Request
 
 LOGGER_NAME = "english_for_developers.request"
+HANDLER_NAME = "eds-request-log"
+_LOG_FORMAT = "%(asctime)s %(message)s"
 
 _logger = logging.getLogger(LOGGER_NAME)
+
+
+def configure_request_logging() -> None:
+    """Attach one stdout handler to the request logger, unless it already exists."""
+    _logger.setLevel(logging.INFO)
+    if any(handler.name == HANDLER_NAME for handler in _logger.handlers):
+        return
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+    handler.name = HANDLER_NAME
+    _logger.addHandler(handler)
 
 
 def _route_template(request: Request, status_code: int) -> str:
