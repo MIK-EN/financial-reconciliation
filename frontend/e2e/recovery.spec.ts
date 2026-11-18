@@ -81,3 +81,18 @@ test("reload keeps a changed starting level", async ({ page }) => {
     "basic_docs",
   );
 });
+
+test("browser back and forward return to the server step", async ({ page }) => {
+  await reachSecondText(page);
+
+  await page.goto("about:blank");
+  await page.goBack();
+
+  await expect(page.getByText("Текст 2", { exact: true })).toBeVisible();
+  await expect(page.getByText("Текст 1", { exact: true })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Все слова знакомы" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Рекомендуем начать с: Основы" }),
+  ).toBeVisible();
+});
