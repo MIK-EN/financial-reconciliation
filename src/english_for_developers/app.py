@@ -1,6 +1,7 @@
 """FastAPI application factory for the English onboarding service."""
 
 from collections.abc import Awaitable, Callable
+from time import perf_counter
 from uuid import uuid4
 
 from fastapi import FastAPI, Request, Response
@@ -11,6 +12,7 @@ from sqlalchemy.exc import DBAPIError
 from english_for_developers.api.auth_routes import router as auth_router
 from english_for_developers.api.browser_routes import router as browser_router
 from english_for_developers.api.errors import ApiError
+from english_for_developers.api.request_logging import log_request
 
 MAX_JSON_BODY_BYTES = 16 * 1024
 
@@ -35,6 +37,7 @@ def create_app() -> FastAPI:
     ) -> Response:
         request_id = uuid4().hex
         request.state.request_id = request_id
+        started_at = perf_counter()
         disable_caching = _requires_no_store(request)
         content_type = request.headers.get("content-type", "")
         if request.method in {"POST", "PUT", "PATCH"} and content_type.startswith(
@@ -42,6 +45,7 @@ def create_app() -> FastAPI:
         ):
             body = await request.body()
             if len(body) > MAX_JSON_BODY_BYTES:
+                request.state.error_code = "request_too_large"
                 error_response = JSONResponse(
                     status_code=413,
                     content={
@@ -53,15 +57,23 @@ def create_app() -> FastAPI:
                 error_response.headers["X-Request-ID"] = request_id
                 if disable_caching:
                     error_response.headers["Cache-Control"] = "no-store"
+                log_request(request, status_code=413, started_at=started_at)
                 return error_response
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            request.state.error_code = "internal_error"
+            log_request(request, status_code=500, started_at=started_at)
+            raise
         response.headers["X-Request-ID"] = request_id
         if disable_caching:
             response.headers["Cache-Control"] = "no-store"
+        log_request(request, status_code=response.status_code, started_at=started_at)
         return response
 
     @app.exception_handler(ApiError)
     async def handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
+        request.state.error_code = exc.code
         return JSONResponse(
             status_code=exc.status_code,
             content={
@@ -73,6 +85,7 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(DBAPIError)
     async def handle_database_error(request: Request, _exc: DBAPIError) -> JSONResponse:
+        request.state.error_code = "database_unavailable"
         return JSONResponse(
             status_code=503,
             content={
@@ -90,6 +103,7 @@ def create_app() -> FastAPI:
             {key: error[key] for key in ("type", "loc", "msg") if key in error}
             for error in exc.errors()
         ]
+        request.state.error_code = "validation_error"
         return JSONResponse(
             status_code=422,
             content={
@@ -103,6 +117,7 @@ def create_app() -> FastAPI:
     @app.exception_handler(Exception)
     async def handle_unexpected_error(request: Request, _exc: Exception) -> JSONResponse:
         request_id = request.state.request_id
+        request.state.error_code = "internal_error"
         response = JSONResponse(
             status_code=500,
             content={
