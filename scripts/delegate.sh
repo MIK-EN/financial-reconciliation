@@ -3,7 +3,9 @@
 # Usage: scripts/delegate.sh <model-or-pattern> <brief.md> [slug]
 #   model-or-pattern: full id "provider/model", or a pattern like "deepseek" / "longcat"
 #                     (pattern resolves against `opencode models`, free models preferred)
-# Env: DELEGATE_TIMEOUT (sec, default 1200), DELEGATE_DIR (worktrees base)
+# Env: DELEGATE_TIMEOUT (sec, default 1200), DELEGATE_DIR (worktrees base),
+#      DELEGATE_LINKS (space-separated gitignored paths to symlink from the main
+#      checkout into the worktree, e.g. ".env frontend/node_modules" for e2e runs)
 set -euo pipefail
 
 MODEL_ARG="${1:?usage: delegate.sh <model-or-pattern> <brief.md> [slug]}"
@@ -36,6 +38,11 @@ mkdir -p "$BASE"
 git -C "$ROOT" worktree add -q -b "$BRANCH" "$WT" HEAD
 # agent config may be untracked: copy it so `--agent worker` resolves in the worktree
 [ -d "$WT/.opencode" ] || cp -R "$ROOT/.opencode" "$WT/.opencode"
+EXCL=(':!.opencode')
+for L in ${DELEGATE_LINKS:-}; do
+  EXCL+=(":!$L")
+  if [ -e "$ROOT/$L" ] && [ ! -e "$WT/$L" ]; then ln -s "$ROOT/$L" "$WT/$L"; fi
+done
 
 TO="${DELEGATE_TIMEOUT:-1200}"
 T=()
@@ -54,9 +61,9 @@ echo "WORKTREE: $WT"
 echo "LOG:      $LOG"
 echo "EXIT:     $RC  (124 = timeout)"
 echo "--- git status ---"
-git -C "$WT" status --short -- . ':!.opencode'
+git -C "$WT" status --short -- . "${EXCL[@]}"
 echo "--- diff stat ---"
-git -C "$WT" add -N -- . ':!.opencode' >/dev/null 2>&1 || true
-git -C "$WT" diff --stat HEAD -- . ':!.opencode'
+git -C "$WT" add -N -- . "${EXCL[@]}" >/dev/null 2>&1 || true
+git -C "$WT" diff --stat HEAD -- . "${EXCL[@]}"
 echo "--- worker report (tail of log) ---"
 tail -n 25 "$LOG"
