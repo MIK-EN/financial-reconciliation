@@ -98,7 +98,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Playwright поднимает Uvicorn и Vite сам. Текущий набор проверяет гостевой маршрут, черновик и reload, недоступный storage, сетевой retry, 409-восстановление, выбор сложности, регистрацию, потерю auth-cookie, logout/login, явный claim, клавиатуру и мобильный viewport.
+Pytest очищает тестовую БД, поэтому после него повторите миграцию и импорт контента перед Playwright. Playwright поднимает Uvicorn и Vite сам, ждёт готовности `/openapi.json` и отказывается стартовать, если `TEST_DATABASE_URL` не оканчивается на `_test`; аккаунты в тестах синтетические (`e2e_<время>`). Повторы тестов отключены, чтобы не маскировать падения. В CI те же шаги выполняет job `e2e` (PostgreSQL 17, `npm ci`, typecheck, build, `playwright install chromium --with-deps`; при падении выгружается HTML-отчёт). Текущий набор проверяет гостевой маршрут, черновик и reload, недоступный storage, сетевой retry, 409-восстановление, выбор сложности, регистрацию, потерю auth-cookie, logout/login, явный claim, клавиатуру и мобильный viewport.
 
 ## Демонстрация правил
 

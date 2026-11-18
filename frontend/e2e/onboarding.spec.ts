@@ -279,6 +279,8 @@ test("mobile guest can start and select a word with the keyboard", async ({ page
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
+  // Wait for the app to render before tabbing; otherwise Tab fires before the button exists.
+  await expect(page.getByRole("button", { name: "Начать" })).toBeVisible();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Начать" })).toBeFocused();
   await page.keyboard.press("Enter");
