@@ -100,6 +100,40 @@ npm run test:e2e
 
 Pytest очищает тестовую БД, поэтому после него повторите миграцию и импорт контента перед Playwright. Playwright поднимает Uvicorn и Vite сам, ждёт готовности `/openapi.json` и отказывается стартовать, если `TEST_DATABASE_URL` не оканчивается на `_test`; аккаунты в тестах синтетические (`e2e_<время>`). Повторы тестов отключены, чтобы не маскировать падения. В CI те же шаги выполняет job `e2e` (PostgreSQL 17, `npm ci`, typecheck, build, `playwright install chromium --with-deps`; при падении выгружается HTML-отчёт). Текущий набор проверяет гостевой маршрут, черновик и reload, недоступный storage, сетевой retry, 409-восстановление, выбор сложности, регистрацию, потерю auth-cookie, logout/login, явный claim, клавиатуру и мобильный viewport.
 
+## Production-сборка локально
+
+Production-подобный стек собирается из `Dockerfile` и `deploy/compose.production.yaml` и публикует прокси только на `127.0.0.1`. Публичного хостинга, TLS и домена пока нет — это отдельная задача; cookie `__Host-` требуют HTTPS, поэтому реальная браузерная сессия появится вместе с TLS, а проверки через curl на localhost работают.
+
+Создайте отдельный git-ignored env-файл из production-блока `.env.example` (пример имени — `.env.production`) и задайте `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` и `EXPECTED_ORIGIN`. Пароль попадает в `DATABASE_URL`, поэтому используйте hex-символы. Необязательный `HTTP_PORT` по умолчанию `8080`. Проверка конфигурации:
+
+```bash
+docker compose --env-file .env.production -f deploy/compose.production.yaml config -q
+```
+
+Релиз: сборка, запуск PostgreSQL, миграции, импорт контента, затем backend и proxy. Миграции и импорт — отдельные one-shot команды профиля `release`, а не часть старта backend.
+
+```bash
+docker compose --env-file .env.production -f deploy/compose.production.yaml build
+```
+
+```bash
+docker compose --env-file .env.production -f deploy/compose.production.yaml up -d postgres
+```
+
+```bash
+docker compose --env-file .env.production -f deploy/compose.production.yaml run --rm migrate
+```
+
+```bash
+docker compose --env-file .env.production -f deploy/compose.production.yaml run --rm import-content
+```
+
+```bash
+docker compose --env-file .env.production -f deploy/compose.production.yaml up -d
+```
+
+Полный порядок, проверка готовности, логи, лимиты запросов, очистка сессий, резервное копирование и проверка восстановления — в [runbook](docs/runbook.md).
+
 ## Демонстрация правил
 
 Из корня проекта можно получить рекомендацию для пользователя, которому знакомы все слова:
@@ -136,7 +170,7 @@ PY
 
 ## CI и дальнейшие шаги
 
-Текущий GitHub Actions запускает Python-проверки с PostgreSQL 17. Frontend и Playwright подтверждены локально, но ещё не добавлены в удалённый CI; это задача 8 плана вместе с расширенной проверкой сбоев и изоляцией E2E-БД. Публичное развёртывание пока не настроено. Коммиты и push выполняются только по запросу пользователя.
+Текущий GitHub Actions запускает Python-проверки с PostgreSQL 17. Frontend и Playwright подтверждены локально, но ещё не добавлены в удалённый CI; это задача 8 плана вместе с расширенной проверкой сбоев и изоляцией E2E-БД. Публичное развёртывание (TLS, домен и реальный хост) пока не настроено. Коммиты и push выполняются только по запросу пользователя.
 
 ## Документация
 
