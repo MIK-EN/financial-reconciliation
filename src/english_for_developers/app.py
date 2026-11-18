@@ -12,7 +12,7 @@ from sqlalchemy.exc import DBAPIError
 from english_for_developers.api.auth_routes import router as auth_router
 from english_for_developers.api.browser_routes import router as browser_router
 from english_for_developers.api.errors import ApiError
-from english_for_developers.api.request_logging import log_request
+from english_for_developers.api.request_logging import configure_request_logging, log_request
 
 MAX_JSON_BODY_BYTES = 16 * 1024
 
@@ -29,6 +29,7 @@ def _requires_no_store(request: Request) -> bool:
 
 def create_app() -> FastAPI:
     """Create the HTTP application with its route dependencies."""
+    configure_request_logging()
     app = FastAPI(title="English for Developers")
 
     @app.middleware("http")
