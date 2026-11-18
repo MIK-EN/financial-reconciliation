@@ -9,6 +9,15 @@ COPY frontend/ ./
 RUN npm run build
 
 
+FROM nginx:1.28-alpine AS proxy
+
+COPY --from=frontend-build /app/frontend/dist /usr/share/nginx/html
+COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
+COPY deploy/trusted-proxies.conf /etc/nginx/trusted-proxies.conf
+
+EXPOSE 80
+
+
 FROM python:3.13-slim AS backend
 
 COPY --from=ghcr.io/astral-sh/uv:0.8.15 /uv /usr/local/bin/uv

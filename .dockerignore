@@ -24,6 +24,5 @@ HUMAN.MD
 !README.md
 .DS_Store
 scripts
-deploy
 compose.yaml
 docker
