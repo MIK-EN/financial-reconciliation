@@ -5,6 +5,7 @@ import json
 import os
 import sys
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -12,6 +13,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from english_for_developers.content.importer import import_bundle
 from english_for_developers.content.schema import ContentBundle
 from english_for_developers.content.validation import validate_bundle
+from english_for_developers.storage.cleanup import cleanup_expired_sessions
 from english_for_developers.storage.database import make_session_factory
 
 
@@ -33,12 +35,30 @@ def _parser() -> argparse.ArgumentParser:
     publish.add_argument("path", type=Path)
     publish.add_argument("--activate", action="store_true")
     publish.add_argument("--threshold-percent", type=int, default=20)
+
+    sessions = groups.add_parser("sessions", help="manage browser sessions")
+    session_commands = sessions.add_subparsers(dest="command", required=True)
+    session_commands.add_parser("cleanup", help="delete anonymous onboarding data past retention")
     return parser
+
+
+def _cleanup_sessions() -> int:
+    database_url = os.environ.get("DATABASE_URL")
+    if not database_url:
+        raise ValueError("Set DATABASE_URL before cleaning up sessions")
+    session_factory = make_session_factory(database_url)
+    with session_factory.begin() as session:
+        result = cleanup_expired_sessions(session, datetime.now(UTC))
+    print(f"cleanup completed: runs={result.runs} steps={result.steps} sessions={result.sessions}")
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        if args.group == "sessions":
+            return _cleanup_sessions()
+
         bundle = _load_bundle(args.path)
         if args.command == "validate":
             print(f"valid {bundle.bundle_version} sha256:{bundle.content_hash}")

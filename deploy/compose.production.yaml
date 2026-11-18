@@ -1,0 +1,142 @@
+# Production stack for "English for Developers".
+#
+# Run from the repository root (paths resolve relative to this file):
+#   docker compose -f deploy/compose.production.yaml build
+#   docker compose -f deploy/compose.production.yaml run --rm migrate
+#   docker compose -f deploy/compose.production.yaml up -d
+#
+# Secrets come from a separate env file, e.g.:
+#   docker compose --env-file .env.production -f deploy/compose.production.yaml ...
+# (see the production section of .env.example). Required values use ${VAR:?}
+# so a missing secret fails loudly instead of falling back to a default.
+#
+# TLS / public hostname are out of scope: the proxy is published on
+# 127.0.0.1 only.
+
+name: english-for-developers-prod
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: backend
+    image: english-for-developers-backend:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
+      EXPECTED_ORIGIN: ${EXPECTED_ORIGIN:?EXPECTED_ORIGIN is required}
+      APP_ENV: production
+      # The backend is only reachable from the compose network, where nginx is
+      # its only client and nginx overwrites X-Forwarded-For with the TCP peer
+      # address, so every peer on that network may set proxy headers.
+      FORWARDED_ALLOW_IPS: "*"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json', timeout=5)"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  proxy:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: proxy
+    image: english-for-developers-proxy:local
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${HTTP_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/nginx-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # One-shot release commands. They are in the "release" profile so `up`
+  # never starts them; run them explicitly when needed:
+  #   docker compose -f deploy/compose.production.yaml run --rm migrate
+  #   docker compose -f deploy/compose.production.yaml run --rm import-content
+  #   docker compose -f deploy/compose.production.yaml run --rm cleanup
+  # They are intentionally NOT dependencies of backend (no concurrent
+  # auto-migrations).
+  migrate:
+    profiles: ["release"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: backend
+    image: english-for-developers-backend:local
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
+
+  import-content:
+    profiles: ["release"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: backend
+    image: english-for-developers-backend:local
+    command:
+      - python
+      - -m
+      - english_for_developers.cli
+      - content
+      - import
+      - content/onboarding-v1.json
+      - --activate
+      - --threshold-percent
+      - "20"
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
+
+  cleanup:
+    profiles: ["release"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: backend
+    image: english-for-developers-backend:local
+    command: ["python", "-m", "english_for_developers.cli", "sessions", "cleanup"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
+
+volumes:
+  postgres_data:
