@@ -345,7 +345,7 @@ curl -I http://demo.example.com/
 for ip in 1.1.1.1 2.2.2.2 3.3.3.3 4.4.4.4 5.5.5.5 6.6.6.6 7.7.7.7 8.8.8.8; do curl -s -o /dev/null -w '%{http_code}\n' -X POST https://demo.example.com/api/v1/auth/login -H "X-Forwarded-For: $ip" -H 'Origin: https://demo.example.com' -H 'Content-Type: application/json' -d '{"username":"rate_check","password":"wrong-password-123"}'; done
 ```
 
-Ожидается: первые шесть ответов приходят от backend (при неверном пароле это `401`), затем `429`; подделка `X-Forwarded-For` лимит не обходит.
+Ожидается: первые шесть ответов приходят от backend (здесь это `403`: у запроса нет cookie браузерной сессии и CSRF-токена, поэтому он отклоняется приложением — для проверки лимита код ответа backend не важен), затем `429`; подделка `X-Forwarded-For` лимит не обходит.
 
 ### Расписание
 
