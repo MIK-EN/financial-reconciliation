@@ -312,7 +312,7 @@ docker compose --env-file .env.production -f deploy/compose.production.yaml -f d
 Если стек уже был запущен без VPS-override, перед первым `up` с ним выполните `down`: override меняет подсеть сети `default` на `172.30.50.0/24`, и переключение работающего стека ломает сеть. Используйте именно `down`, а не `down -v`: `-v` удаляет том `postgres_data` с базой. На свежем сервере просто начните сразу с двух файлов.
 
 ```bash
-docker compose --env-file .env.production -f deploy/compose.production.yaml down
+docker compose --env-file .env.production -f deploy/compose.production.yaml -f deploy/compose.vps.yaml down
 ```
 
 ### Проверка после выпуска
@@ -342,7 +342,7 @@ curl -I http://demo.example.com/
 Лимит логинов: восемь попыток с разными подделанными `X-Forwarded-For` (Caddy перезаписывает заголовок реальным TCP-адресом клиента):
 
 ```bash
-for ip in 1.1.1.1 2.2.2.2 3.3.3.3 4.4.4.4 5.5.5.5 6.6.6.6 7.7.7.7 8.8.8.8; do curl -s -o /dev/null -w '%{http_code}\n' -X POST https://demo.example.com/api/v1/auth/login -H "X-Forwarded-For: $ip" -H 'Origin: https://demo.example.com' -H 'Content-Type: application/json' -d '{"username":"rate-check","password":"wrong-password-123"}'; done
+for ip in 1.1.1.1 2.2.2.2 3.3.3.3 4.4.4.4 5.5.5.5 6.6.6.6 7.7.7.7 8.8.8.8; do curl -s -o /dev/null -w '%{http_code}\n' -X POST https://demo.example.com/api/v1/auth/login -H "X-Forwarded-For: $ip" -H 'Origin: https://demo.example.com' -H 'Content-Type: application/json' -d '{"username":"rate_check","password":"wrong-password-123"}'; done
 ```
 
 Ожидается: первые шесть ответов приходят от backend (при неверном пароле это `401`), затем `429`; подделка `X-Forwarded-For` лимит не обходит.
