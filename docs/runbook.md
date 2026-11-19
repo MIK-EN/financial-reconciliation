@@ -1,6 +1,6 @@
 # Runbook: локальный production-подобный стек
 
-Документ описывает эксплуатацию production-подобной сборки «Английский для разработчиков» на локальной машине. Публичного хостинга нет: прокси опубликован только на `127.0.0.1`. TLS, HTTPS, домен и реальный хост — задача 10; до неё стек доступен на `localhost` с портом из `HTTP_PORT`.
+Документ описывает эксплуатацию production-подобной сборки «Английский для разработчиков» на локальной машине. Публичного хостинга пока нет: прокси опубликован только на `127.0.0.1`, поэтому локально нет ни TLS, ни домена — стек доступен на `localhost` с портом из `HTTP_PORT`. Подготовка размещения на одном VPS с Caddy и Let's Encrypt описана в разделе «Публичное размещение на VPS»; реальный сервер, домен и выпуск ещё не выполнены.
 
 Все команды выполняются из корня репозитория и предполагают файл `.env.production`.
 
@@ -131,7 +131,7 @@ nginx пишет строку:
 
 По умолчанию nginx берёт TCP-адрес peer. Чтобы доверять вышестоящему прокси, добавьте строки `set_real_ip_from <addr>;` в `deploy/trusted-proxies.conf` и пересоберите образ proxy. За Docker Desktop NAT все клиенты могут иметь один адрес — тогда лимиты считаются на NAT.
 
-TLS, HTTPS, домен и реальный хост — задача 10. Cookie `__Host-` имеют флаг `Secure`, поэтому реальная браузерная сессия требует HTTPS; для проверок через curl на localhost это не мешает.
+TLS, HTTPS, домен и реальный хост — см. раздел «Публичное размещение на VPS» (подготовлен, но не развёрнут). Cookie `__Host-` имеют флаг `Secure`, поэтому реальная браузерная сессия требует HTTPS; для проверок через curl на localhost это не мешает.
 
 ## Очистка сессий
 
@@ -160,6 +160,268 @@ PGUSER=english_dev PGDATABASE=english_for_developers BACKUP_DIR=/var/backups/eng
 Политика: ежедневная копия, хранить 7 новейших; для реального использования `BACKUP_DIR` — на другом диске или хосте, не на том же, что том БД.
 
 Потеря данных: всё записанное после последней копии при восстановлении теряется (до ~24 ч при ежедневной копии). Более строгие RPO/RTO не обещаны. Копия не шифруется и содержит хеши паролей — защитите её.
+
+## Публичное размещение на VPS
+
+Публичное размещение подготовлено, но не выполнено: реальных VPS, домена и сертификата Let's Encrypt пока нет. Раздел описывает выпуск уже проверенной локально сборки на одном сервере, где Caddy завершает TLS перед nginx. Команды рассчитаны на пользователя `deploy` и checkout в `/opt/english-for-developers`; путь без пробелов — обязательное требование `scripts/vps-job.sh`.
+
+### Состав и стоимость
+
+| Статья | Ориентир |
+| --- | --- |
+| VPS 2 vCPU / 2–4 GB (рекомендация — Hetzner Cloud) | около 4–5 EUR в месяц |
+| Домен | бесплатный поддомен — 0; свой домен — дополнительно к бюджету |
+| Итого | цель — не более ~7 USD в месяц |
+
+Точные цены и наличие ресурсов проверяйте в консоли провайдера на момент заказа: цифры выше — ориентир, а не подтверждённая расценка. Бюджетный потолок пользователя — около 7 USD в месяц.
+
+### Подготовка сервера
+
+- Ubuntu LTS.
+- Отдельный непривилегированный пользователь `deploy`.
+- Вход по SSH-ключам, парольный вход отключён.
+- Firewall: открыты 22, 80 и 443.
+- Автоматические обновления безопасности.
+- Docker Engine и Compose plugin из официального apt-репозитория Docker: следуйте официальной инструкции https://docs.docker.com/engine/install/ubuntu/ — команды здесь не приводим, чтобы они не разошлись с актуальной версией.
+- Пользователь `deploy` входит в группу `docker`.
+
+```bash
+sudo adduser deploy
+```
+
+```bash
+sudo usermod -aG docker deploy
+```
+
+```bash
+sudo ufw allow 22
+```
+
+```bash
+sudo ufw allow 80
+```
+
+```bash
+sudo ufw allow 443
+```
+
+```bash
+sudo ufw enable
+```
+
+```bash
+sudo apt update
+```
+
+```bash
+sudo apt install unattended-upgrades
+```
+
+```bash
+sudo dpkg-reconfigure -plow unattended-upgrades
+```
+
+Отключите парольный вход в `/etc/ssh/sshd_config` (или drop-in-файле в `/etc/ssh/sshd_config.d/`) и проверьте конфигурацию перед перезапуском:
+
+```bash
+sudo sshd -t
+```
+
+```bash
+sudo systemctl reload ssh
+```
+
+Docker публикует порты через iptables напрямую и обходит `ufw`, поэтому для внешнего доступа достаточно открыть 80 и 443 (плюс 22 для администрирования). PostgreSQL и backend не публикуются вовсе; nginx остаётся на `127.0.0.1:${HTTP_PORT:-8080}` и снаружи недоступен.
+
+### DNS и env
+
+Запись A домена на IPv4-адрес сервера должна существовать до первого запуска: Let's Encrypt выпустит сертификат, только когда домен указывает на этот сервер, а проверка идёт через порт 80 (нужен и 443).
+
+Создайте checkout:
+
+```bash
+sudo mkdir -p /opt/english-for-developers
+```
+
+```bash
+sudo chown deploy:deploy /opt/english-for-developers
+```
+
+```bash
+sudo -u deploy git clone <git-url-репозитория> /opt/english-for-developers
+```
+
+Путь без пробелов обязателен: `scripts/vps-job.sh` отказывается работать в каталоге с пробелом.
+
+Сгенерируйте пароль и впишите его в `.env.production`:
+
+```bash
+openssl rand -hex 32
+```
+
+```bash
+sudo -u deploy tee /opt/english-for-developers/.env.production >/dev/null <<'EOF'
+POSTGRES_DB=english_for_developers
+POSTGRES_USER=english_dev
+POSTGRES_PASSWORD=вставьте-вывод-openssl-rand-hex-32
+DOMAIN=demo.example.com
+EXPECTED_ORIGIN=https://demo.example.com
+EOF
+```
+
+```bash
+sudo chmod 600 /opt/english-for-developers/.env.production
+```
+
+Замените `demo.example.com` на свой домен. `DOMAIN` обязателен для `deploy/compose.vps.yaml`, а `EXPECTED_ORIGIN` должен быть равен `https://<DOMAIN>`.
+
+### Выпуск
+
+Используйте оба compose-файла: базовый и VPS-override (`deploy/compose.vps.yaml` добавляет контейнер `caddy` и монтирует `deploy/trusted-proxies.vps.conf`).
+
+Собрать образы:
+
+```bash
+docker compose --env-file .env.production -f deploy/compose.production.yaml -f deploy/compose.vps.yaml build
+```
+
+Поднять PostgreSQL:
+
+```bash
+docker compose --env-file .env.production -f deploy/compose.production.yaml -f deploy/compose.vps.yaml up -d postgres
+```
+
+Применить миграции:
+
+```bash
+docker compose --env-file .env.production -f deploy/compose.production.yaml -f deploy/compose.vps.yaml run --rm migrate
+```
+
+Импортировать контент:
+
+```bash
+docker compose --env-file .env.production -f deploy/compose.production.yaml -f deploy/compose.vps.yaml run --rm import-content
+```
+
+Запустить backend, proxy и Caddy:
+
+```bash
+docker compose --env-file .env.production -f deploy/compose.production.yaml -f deploy/compose.vps.yaml up -d
+```
+
+Если стек уже был запущен без VPS-override, перед первым `up` с ним выполните `down`: override меняет подсеть сети `default` на `172.30.50.0/24`, и переключение работающего стека ломает сеть. Используйте именно `down`, а не `down -v`: `-v` удаляет том `postgres_data` с базой. На свежем сервере просто начните сразу с двух файлов.
+
+```bash
+docker compose --env-file .env.production -f deploy/compose.production.yaml down
+```
+
+### Проверка после выпуска
+
+Выпуск сертификата может занять около минуты. Логи Caddy:
+
+```bash
+docker compose --env-file .env.production -f deploy/compose.production.yaml -f deploy/compose.vps.yaml logs caddy
+```
+
+HTTPS:
+
+```bash
+curl -I https://demo.example.com/
+```
+
+Ожидается `HTTP/2 200` и заголовок `strict-transport-security: max-age=31536000`.
+
+Перенаправление с HTTP:
+
+```bash
+curl -I http://demo.example.com/
+```
+
+Ожидается `308` с перенаправлением на `https://…`.
+
+Лимит логинов: восемь попыток с разными подделанными `X-Forwarded-For` (Caddy перезаписывает заголовок реальным TCP-адресом клиента):
+
+```bash
+for ip in 1.1.1.1 2.2.2.2 3.3.3.3 4.4.4.4 5.5.5.5 6.6.6.6 7.7.7.7 8.8.8.8; do curl -s -o /dev/null -w '%{http_code}\n' -X POST https://demo.example.com/api/v1/auth/login -H "X-Forwarded-For: $ip" -H 'Origin: https://demo.example.com' -H 'Content-Type: application/json' -d '{"username":"rate-check","password":"wrong-password-123"}'; done
+```
+
+Ожидается: первые шесть ответов приходят от backend (при неверном пароле это `401`), затем `429`; подделка `X-Forwarded-For` лимит не обходит.
+
+### Расписание
+
+Установите файл расписания (имя без точки, владелец root, права 644):
+
+```bash
+sudo install -m 644 deploy/vps/efd.cron /etc/cron.d/english-for-developers
+```
+
+Перед установкой замените в файле `deploy` на реального пользователя размещения и `/opt/english-for-developers` на реальный путь checkout. Создайте лог и каталог копий:
+
+```bash
+sudo install -m 640 -o deploy -g adm /dev/null /var/log/efd-jobs.log
+```
+
+```bash
+sudo mkdir -p /var/backups/english-for-developers
+```
+
+```bash
+sudo chown deploy:deploy /var/backups/english-for-developers
+```
+
+Сначала выполните обе задачи вручную от имени `deploy`:
+
+```bash
+sudo -u deploy /opt/english-for-developers/scripts/vps-job.sh backup
+```
+
+```bash
+sudo -u deploy /opt/english-for-developers/scripts/vps-job.sh cleanup
+```
+
+`backup` печатает `backup ok: <путь>` и оставляет 7 новейших дампов; `cleanup` печатает `cleanup completed: runs=… steps=… sessions=…`. Обе команды уже проверены на локальном стеке (2026-11-19).
+
+По расписанию (время — локальное время сервера, на VPS это UTC) backup стартует в 03:15, cleanup — в 03:45: дамп снимается до удаления сессий. Фактическое срабатывание cron ещё не проверялось. На следующий день посмотрите лог:
+
+```bash
+sudo tail -n 50 /var/log/efd-jobs.log
+```
+
+### Копия вне сервера
+
+Дамп лежит на том же диске, что и БД: при отказе диска сервера потеряются и база, и все локальные копии. Регулярно забирайте свежие дампы на свой компьютер по SSH:
+
+```bash
+rsync -avz --progress deploy@<IPv4-сервера>:/var/backups/english-for-developers/ ~/efd-backups/
+```
+
+Это не автоматизировано: запускайте команду периодически (например, раз в неделю) на своей машине. У провайдера могут быть платные snapshot-копии — их цену проверьте в консоли.
+
+RPO честно: при ежедневном backup теряется до ~24 ч данных, записанных после последнего дампа. Пока копия не вынесена с сервера, она не защищает от отказа диска.
+
+### Проверка восстановления на VPS
+
+Перед тем как считать демо готовым, повторите на VPS проверку из раздела «Проверка восстановления»: восстановите свежий дамп в новую scratch-БД, сравните счётчики, версии и хеш контента, ревизию alembic, проверьте вход и сохранённый результат, затем удалите scratch-БД. В реальных условиях это ещё не выполнялось.
+
+### Что подтверждено и что нет
+
+Проверено локально 2026-11-19 на полном compose-стеке с `DOMAIN=localhost` (внутренний CA Caddy, без Let's Encrypt):
+
+- HTTPS отвечает `HTTP/2 200`; присутствуют `strict-transport-security: max-age=31536000`, `cache-control: no-store`, CSP и `X-Frame-Options`.
+- `http://` получает `308` с перенаправлением на `https://`.
+- Восемь логинов через Caddy с разными подделанными `X-Forwarded-For`: шесть ответов backend, затем `429` — лимит не обойден.
+- nginx логирует реальный TCP-peer, а не адрес Caddy и не подделанный адрес; запрос напрямую к nginx из не-Caddy контейнера с подделанным `X-Forwarded-For` атрибутируется собственному адресу отправителя.
+- `scripts/vps-job.sh backup` создал проверенный custom-format дамп с правами `600` и напечатал `backup ok: <путь>`; `scripts/vps-job.sh cleanup` напечатал `cleanup completed: runs=0 steps=0 sessions=0`.
+
+Ещё не сделано:
+
+- Реальный VPS, реальный домен и реальный сертификат Let's Encrypt.
+- `flock` на Linux.
+- Фактическое срабатывание cron-расписания.
+- Копия вне сервера.
+- Проверка восстановления на VPS.
+- Публичный запуск CI.
+- Проход сайта в чистом браузере.
 
 ## Проверка восстановления
 
