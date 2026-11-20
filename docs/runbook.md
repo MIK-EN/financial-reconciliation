@@ -183,10 +183,14 @@ PGUSER=english_dev PGDATABASE=english_for_developers BACKUP_DIR=/var/backups/eng
 - Firewall: открыты 22, 80 и 443.
 - Автоматические обновления безопасности.
 - Docker Engine и Compose plugin из официального apt-репозитория Docker: следуйте официальной инструкции https://docs.docker.com/engine/install/ubuntu/ — команды здесь не приводим, чтобы они не разошлись с актуальной версией.
-- Пользователь `deploy` входит в группу `docker`.
+- Пользователь `deploy` входит в группы `sudo` и `docker`.
 
 ```bash
 sudo adduser deploy
+```
+
+```bash
+sudo usermod -aG sudo deploy
 ```
 
 ```bash
@@ -214,6 +218,20 @@ sudo apt update
 ```
 
 ```bash
+sudo apt install tmux
+```
+
+Обновите систему внутри `tmux` — интерактивный диалог или оборванная SSH-сессия прервали первое обновление:
+
+```bash
+tmux new -s upgrade
+```
+
+```bash
+sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y
+```
+
+```bash
 sudo apt install unattended-upgrades
 ```
 
@@ -221,7 +239,16 @@ sudo apt install unattended-upgrades
 sudo dpkg-reconfigure -plow unattended-upgrades
 ```
 
-Отключите парольный вход в `/etc/ssh/sshd_config` (или drop-in-файле в `/etc/ssh/sshd_config.d/`) и проверьте конфигурацию перед перезапуском:
+Отключите парольный вход drop-in-файлом `/etc/ssh/sshd_config.d/00-hardening.conf`: sshd берёт первое найденное значение, поэтому имя файла должно сортироваться раньше `50-cloud-init.conf`. Перед отключением паролей убедитесь, что вход по ключу работает во втором терминале.
+
+```bash
+sudo tee /etc/ssh/sshd_config.d/00-hardening.conf >/dev/null <<'EOF'
+PasswordAuthentication no
+PermitRootLogin prohibit-password
+EOF
+```
+
+Проверьте конфигурацию перед перезапуском:
 
 ```bash
 sudo sshd -t
@@ -251,26 +278,44 @@ sudo chown deploy:deploy /opt/english-for-developers
 sudo -u deploy git clone <git-url-репозитория> /opt/english-for-developers
 ```
 
-Путь без пробелов обязателен: `scripts/vps-job.sh` отказывается работать в каталоге с пробелом.
-
-Сгенерируйте пароль и впишите его в `.env.production`:
+Если ветка ещё не отправлена в remote, передайте код через `git archive` и `scp` (первые две команды — на машине разработчика, третья — на сервере):
 
 ```bash
-openssl rand -hex 32
+git archive --format=tar.gz -o /tmp/efd.tar.gz HEAD
 ```
 
 ```bash
-sudo -u deploy tee /opt/english-for-developers/.env.production >/dev/null <<'EOF'
+scp /tmp/efd.tar.gz deploy@<IP>:/tmp/
+```
+
+```bash
+tar -xzf /tmp/efd.tar.gz -C /opt/english-for-developers
+```
+
+Путь без пробелов обязателен: `scripts/vps-job.sh` отказывается работать в каталоге с пробелом.
+
+Создайте `.env.production` от имени `deploy` в каталоге checkout, с паролем, который нигде не печатается:
+
+```bash
+cd /opt/english-for-developers
+```
+
+```bash
+umask 077
+```
+
+```bash
+cat > .env.production <<EOF
 POSTGRES_DB=english_for_developers
 POSTGRES_USER=english_dev
-POSTGRES_PASSWORD=вставьте-вывод-openssl-rand-hex-32
+POSTGRES_PASSWORD=$(openssl rand -hex 32)
 DOMAIN=demo.example.com
 EXPECTED_ORIGIN=https://demo.example.com
 EOF
 ```
 
 ```bash
-sudo chmod 600 /opt/english-for-developers/.env.production
+chmod 600 /opt/english-for-developers/.env.production
 ```
 
 Замените `demo.example.com` на свой домен. `DOMAIN` обязателен для `deploy/compose.vps.yaml`, а `EXPECTED_ORIGIN` должен быть равен `https://<DOMAIN>`.
@@ -278,6 +323,12 @@ sudo chmod 600 /opt/english-for-developers/.env.production
 ### Выпуск
 
 Используйте оба compose-файла: базовый и VPS-override (`deploy/compose.vps.yaml` добавляет контейнер `caddy` и монтирует `deploy/trusted-proxies.vps.conf`).
+
+Чтобы не набирать команду целиком, определите функцию оболочки: в zsh команда, сохранённая в переменной, не разбивается на слова, поэтому переменная не подходит; после нового входа функцию нужно определить заново.
+
+```bash
+dc() { docker compose --env-file .env.production -f deploy/compose.production.yaml -f deploy/compose.vps.yaml "$@"; }
+```
 
 Собрать образы:
 
@@ -412,6 +463,12 @@ RPO честно: при ежедневном backup теряется до ~24 �
 - Восемь логинов через Caddy с разными подделанными `X-Forwarded-For`: шесть ответов backend, затем `429` — лимит не обойден.
 - nginx логирует реальный TCP-peer, а не адрес Caddy и не подделанный адрес; запрос напрямую к nginx из не-Caddy контейнера с подделанным `X-Forwarded-For` атрибутируется собственному адресу отправителя.
 - `scripts/vps-job.sh backup` создал проверенный custom-format дамп с правами `600` и напечатал `backup ok: <путь>`; `scripts/vps-job.sh cleanup` напечатал `cleanup completed: runs=0 steps=0 sessions=0`.
+
+Ограничения:
+
+- Посетители с VPN могут не открыть сайт: некоторые VPN режут трафик на небольшие диапазоны IP хостинга или необычные домены; это вне контроля сервера — на самом сервере Caddy отвечает любому Host с `308`/`200`.
+
+Docker Hub с российского хоста был доступен: образ `hello-world` скачан.
 
 Ещё не сделано:
 
