@@ -6,6 +6,7 @@ import {
   Clock,
   Folder,
   LockOpen,
+  Plus,
   Sliders,
   WarningCircle,
 } from "./Icons";
@@ -41,6 +42,41 @@ const LEVELS = [
     name: "Сложные тексты",
     sample:
       "Repeated requests may cause duplicate operations, so this behavior should only be enabled when the server can safely handle them.",
+  },
+];
+
+const FAQ = [
+  {
+    q: "Это тест уровня английского?",
+    a: "Нет. Мы смотрим только на слова, которые вы отметили как незнакомые. Результат подсказывает, с какой сложности начать, и не заменяет оценку по CEFR.",
+  },
+  {
+    q: "Сколько текстов придётся прочитать?",
+    a: "От двух до четырёх, каждый на несколько строк. Если первый текст трудный, мы покажем ещё один, проще, и на этом подбор закончится.",
+  },
+  {
+    q: "Какое слово считать незнакомым?",
+    a: "Любое, значение которого вам непонятно именно в этом предложении. Если непонятно выражение целиком, отметьте все его слова.",
+  },
+  {
+    q: "Как вы решаете, что текст трудный?",
+    a: "Если незнакомых слов больше 20% от учитываемых, текст считается трудным. Повторы, числа, знаки и имена функций не учитываются.",
+  },
+  {
+    q: "Нужна ли регистрация?",
+    a: "Нет. Подбор проходится без аккаунта. Создать аккаунт можно после результата, чтобы открыть его снова после нового входа.",
+  },
+  {
+    q: "Что если я не согласен с рекомендацией?",
+    a: "Выберите другую сложность на экране результата. Мы сохраним ваш выбор отдельно от рекомендации.",
+  },
+  {
+    q: "Можно восстановить пароль?",
+    a: "Пока нет. В первой версии нет почты и восстановления доступа, поэтому сохраните пароль в менеджере паролей.",
+  },
+  {
+    q: "Когда появятся занятия?",
+    a: "Короткие занятия с проверкой ответов и повторением ошибок готовятся следующим этапом. Сейчас доступен подбор стартовой сложности.",
   },
 ];
 
@@ -233,6 +269,9 @@ export function Landing({ busy, error, onStart, onLogin }: LandingProps) {
             </a>
             <a className="nav-link" href="#levels">
               Уровни
+            </a>
+            <a className="nav-link" href="#faq">
+              Вопросы
             </a>
           </div>
           <button
@@ -460,7 +499,63 @@ export function Landing({ busy, error, onStart, onLogin }: LandingProps) {
             </div>
           </div>
         </section>
+
+        <section id="faq" className="section section-muted" aria-labelledby="faq-title">
+          <div className="container faq reveal">
+            <div className="section-head">
+              <h2 id="faq-title" className="heading-2">
+                Частые вопросы
+              </h2>
+            </div>
+            <div className="faq-list">
+              {FAQ.map((item) => (
+                <details key={item.q} className="faq-item">
+                  <summary className="title-2">
+                    {item.q}
+                    <span className="plus">
+                      <Plus />
+                    </span>
+                  </summary>
+                  <p className="body-3 muted">{item.a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="section" aria-labelledby="cta-title">
+          <div className="container reveal">
+            <div className="final-cta">
+              <h2 id="cta-title" className="heading-2">
+                Начните с первого текста
+              </h2>
+              <p className="body-7">
+                Регистрация не нужна. Рекомендацию можно изменить, а аккаунт создать потом, если
+                захотите сохранить результат.
+              </p>
+              <button
+                className="btn btn-marker button-lg"
+                type="button"
+                disabled={busy}
+                onClick={() => start("final")}
+              >
+                {startLabel}
+                <ArrowRight />
+              </button>
+              {errorAlert("final")}
+            </div>
+          </div>
+        </section>
       </main>
+
+      <footer className="container">
+        <div className="footer">
+          <p className="body-6 muted">English for Developers · учебный проект</p>
+          <a className="body-6" href="#top">
+            Наверх
+          </a>
+        </div>
+      </footer>
     </div>
   );
 }
