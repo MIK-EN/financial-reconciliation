@@ -539,6 +539,50 @@ a {
   to { opacity: 0.5; }
 }
 
+/* Text step */
+.step-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.reading-card {
+  padding: 40px;
+}
+
+.reading-text {
+  font-size: 24px;
+  line-height: 40px;
+  font-weight: 500;
+}
+
+.word {
+  display: inline;
+  margin: 0 -2px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 4px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  transition: background-color 300ms var(--ease);
+}
+
+.word:hover:not(:disabled) { background: #f0eee6; }
+.word[aria-pressed="true"] { color: var(--marker-ink); background: var(--marker); }
+.word:disabled { cursor: progress; }
+
+.step-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
 @media (max-width: 720px) {
   .heading-1 { font-size: 36px; line-height: 40px; }
   .heading-2,
@@ -549,6 +593,13 @@ a {
   .flow-main { padding: 32px 16px 48px; gap: 24px; }
   .card,
   .card-muted { padding: 24px; }
+}
+
+@media (max-width: 720px) {
+  .reading-card { padding: 24px; }
+  .reading-text { font-size: 20px; line-height: 36px; }
+  .step-footer .actions,
+  .step-footer .actions .btn { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
