@@ -1,5 +1,11 @@
 import { expect, type Page, test } from "@playwright/test";
 
+function levelRadio(page: Page, name: string) {
+  return page
+    .getByRole("group", { name: "Выбранная сложность" })
+    .getByRole("radio", { name });
+}
+
 async function reachSecondText(page: Page) {
   await page.goto("/");
   await page.getByRole("button", { name: "Начать" }).click();
@@ -70,16 +76,12 @@ test("reload on the result screen keeps the result", async ({ page }) => {
 test("reload keeps a changed starting level", async ({ page }) => {
   await completeSimplifiedRoute(page);
 
-  const level = page.getByRole("combobox", { name: "Выбранная сложность" });
-  await level.selectOption("basic_docs");
-  await expect(level).toHaveValue("basic_docs");
-  await expect(page.getByText("Выбрано: Базовая документация")).toBeVisible();
+  await levelRadio(page, "Базовая документация").click();
+  await expect(levelRadio(page, "Базовая документация")).toBeChecked();
 
   await page.reload();
 
-  await expect(page.getByRole("combobox", { name: "Выбранная сложность" })).toHaveValue(
-    "basic_docs",
-  );
+  await expect(levelRadio(page, "Базовая документация")).toBeChecked();
 });
 
 test("browser back and forward return to the server step", async ({ page }) => {

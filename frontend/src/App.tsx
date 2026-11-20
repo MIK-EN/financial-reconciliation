@@ -278,38 +278,39 @@ export function App() {
     );
   }
   return (
-    <>
-      <ResultScreen
-        run={run}
-        busy={busy}
-        error={error}
-        account={account}
-        accountOfferDismissed={accountOfferDismissed || accountMode !== null}
-        onSelectLevel={(level) => void handleSelection(level)}
-        onRegister={() => {
-          setAccountError(null);
-          setAccountMode("register");
-        }}
-        onLogin={() => {
-          setAccountError(null);
-          setAccountMode("login");
-        }}
-        onLogout={() => void handleLogout()}
-        onClaim={() => void handleClaim()}
-        onDismissAccountOffer={() => {
-          setAccountOfferDismissed(true);
-          setAccountMode(null);
-        }}
-      />
-      {accountMode === null ? null : (
-        <AccountForm
-          mode={accountMode}
-          busy={busy}
-          error={accountError}
-          onSubmit={accountMode === "register" ? handleRegister : handleLogin}
-          onCancel={() => setAccountMode(null)}
-        />
-      )}
-    </>
+    <ResultScreen
+      run={run}
+      busy={busy}
+      error={error}
+      account={account}
+      accountOfferDismissed={accountOfferDismissed}
+      accountForm={
+        accountMode === null ? null : (
+          <AccountForm
+            key={accountMode}
+            mode={accountMode}
+            busy={busy}
+            error={accountError}
+            onSubmit={accountMode === "register" ? handleRegister : handleLogin}
+            onCancel={() => setAccountMode(null)}
+          />
+        )
+      }
+      onSelectLevel={(level) => void handleSelection(level)}
+      onRegister={() => {
+        setAccountError(null);
+        setAccountMode("register");
+      }}
+      onLogin={() => {
+        setAccountError(null);
+        setAccountMode("login");
+      }}
+      onLogout={() => void handleLogout()}
+      onClaim={() => void handleClaim()}
+      onDismissAccountOffer={() => {
+        setAccountOfferDismissed(true);
+        setAccountMode(null);
+      }}
+    />
   );
 }

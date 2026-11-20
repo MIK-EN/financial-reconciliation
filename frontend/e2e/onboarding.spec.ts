@@ -1,5 +1,11 @@
 import { expect, type Page, test } from "@playwright/test";
 
+function levelRadio(page: Page, name: string) {
+  return page
+    .getByRole("group", { name: "Выбранная сложность" })
+    .getByRole("radio", { name });
+}
+
 async function completeSimplifiedRoute(page: Page) {
   await page.goto("/");
   await page.getByRole("button", { name: "Начать" }).click();
@@ -120,11 +126,10 @@ test("guest can deselect a repeated word before submitting", async ({ page }) =>
 test("guest changes the selected starting level", async ({ page }) => {
   await completeSimplifiedRoute(page);
 
-  const level = page.getByRole("combobox", { name: "Выбранная сложность" });
-  await expect(level).toHaveValue("foundations");
-  await level.selectOption("basic_docs");
-  await expect(level).toHaveValue("basic_docs");
-  await expect(page.getByText("Выбрано: Базовая документация")).toBeVisible();
+  await expect(levelRadio(page, "Основы")).toBeChecked();
+  await levelRadio(page, "Базовая документация").click();
+  await expect(levelRadio(page, "Базовая документация")).toBeChecked();
+  await expect(levelRadio(page, "Основы")).not.toBeChecked();
   await expect(
     page.getByRole("heading", { name: "Рекомендуем начать с: Основы" }),
   ).toBeVisible();

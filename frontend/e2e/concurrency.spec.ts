@@ -1,5 +1,11 @@
 import { expect, type Page, test } from "@playwright/test";
 
+function levelRadio(page: Page, name: string) {
+  return page
+    .getByRole("group", { name: "Выбранная сложность" })
+    .getByRole("radio", { name });
+}
+
 async function startRoute(page: Page) {
   await page.goto("/");
   await page.getByRole("button", { name: "Начать" }).click();
@@ -71,20 +77,15 @@ test("stale level change does not overwrite the newer choice", async ({ context,
     second.getByRole("heading", { name: "Рекомендуем начать с: Основы" }),
   ).toBeVisible();
 
-  const pageLevel = page.getByRole("combobox", { name: "Выбранная сложность" });
-  await pageLevel.selectOption("basic_docs");
-  await expect(pageLevel).toHaveValue("basic_docs");
-  await expect(page.getByText("Выбрано: Базовая документация")).toBeVisible();
+  await levelRadio(page, "Базовая документация").click();
+  await expect(levelRadio(page, "Базовая документация")).toBeChecked();
 
-  const secondLevel = second.getByRole("combobox", { name: "Выбранная сложность" });
-  await secondLevel.selectOption("confident_reading");
+  await levelRadio(second, "Уверенное чтение").click();
 
-  await expect(secondLevel).toHaveValue("basic_docs");
-  await expect(second.getByText("Выбрано: Базовая документация")).toBeVisible();
+  await expect(levelRadio(second, "Базовая документация")).toBeChecked();
+  await expect(levelRadio(second, "Уверенное чтение")).not.toBeChecked();
   await expect(second.getByRole("alert")).toHaveCount(0);
 
   await page.reload();
-  await expect(page.getByRole("combobox", { name: "Выбранная сложность" })).toHaveValue(
-    "basic_docs",
-  );
+  await expect(levelRadio(page, "Базовая документация")).toBeChecked();
 });
