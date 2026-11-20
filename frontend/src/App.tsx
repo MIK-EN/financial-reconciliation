@@ -13,6 +13,7 @@ import {
   submitAnswer,
   updateSelection,
 } from "./api";
+import { LoadingScreen } from "./components/FlowShell";
 import { ResultScreen } from "./components/ResultScreen";
 import { StartScreen } from "./components/StartScreen";
 import { TextStep } from "./components/TextStep";
@@ -239,11 +240,7 @@ export function App() {
   }
 
   if (loading) {
-    return (
-      <main className="screen loading-screen" aria-live="polite">
-        Загружаем…
-      </main>
-    );
+    return <LoadingScreen />;
   }
   if (run === null) {
     if (accountMode === "login") {
