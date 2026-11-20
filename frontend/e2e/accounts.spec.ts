@@ -2,7 +2,7 @@ import { expect, type Page, test } from "@playwright/test";
 
 async function completeSimplifiedRoute(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
   for (const word of ["file", "create", "new"]) {
     await page.getByRole("button", { name: word, exact: true }).first().click();
   }
@@ -68,7 +68,7 @@ test("lost Set-Cookie on registration does not keep the user signed in after rel
   await page.reload();
   await expect(page.getByText(`Результат сохранён в аккаунте ${username}`)).toHaveCount(0);
   await expect(
-    page.getByRole("heading", { name: "Подберём стартовую сложность" }),
+    page.getByRole("heading", { name: "С каких текстов начинать читать документацию?" }),
   ).toBeVisible();
 
   await login(page, username);

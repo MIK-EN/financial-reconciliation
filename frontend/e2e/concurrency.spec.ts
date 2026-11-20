@@ -8,7 +8,7 @@ function levelRadio(page: Page, name: string) {
 
 async function startRoute(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
   await expect(page.getByText("Текст 1", { exact: true })).toBeVisible();
 }
 

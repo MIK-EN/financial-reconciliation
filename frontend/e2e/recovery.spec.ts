@@ -8,7 +8,7 @@ function levelRadio(page: Page, name: string) {
 
 async function reachSecondText(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
   for (const word of ["file", "create", "new"]) {
     await page.getByRole("button", { name: word, exact: true }).first().click();
   }
@@ -70,7 +70,7 @@ test("reload on the result screen keeps the result", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Рекомендуем начать с: Основы" }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Начать" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Подобрать сложность" }).first()).toHaveCount(0);
 });
 
 test("reload keeps a changed starting level", async ({ page }) => {
@@ -101,7 +101,7 @@ test("browser back and forward return to the server step", async ({ page }) => {
 
 async function openFirstTextAndSelect(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
   for (const word of ["file", "create", "new"]) {
     await page.getByRole("button", { name: word, exact: true }).first().click();
   }
