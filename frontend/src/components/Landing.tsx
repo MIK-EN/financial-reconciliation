@@ -1,8 +1,12 @@
-import { useMemo, useRef, useState } from "react";
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ArrowRight,
   Check,
+  Clock,
+  Folder,
+  LockOpen,
+  Sliders,
   WarningCircle,
 } from "./Icons";
 
@@ -19,6 +23,102 @@ const DEMO_TEXT =
   "The function returns a list of matching items. If you omit the optional limit parameter, it returns all available results.";
 const DEMO_INITIAL = ["omit", "optional"];
 const DIFFICULT_SHARE = 0.2;
+
+const TAGLINE =
+  "Не нужно знать весь английский. Нужно понимать слова, из которых состоит документация.";
+
+const LEVELS = [
+  { name: "Основы", sample: "Open the file. Read the text. Save your changes." },
+  {
+    name: "Базовая документация",
+    sample: "Before you install the application, check the system requirements.",
+  },
+  {
+    name: "Уверенное чтение",
+    sample: "If you omit the optional limit parameter, it returns all available results.",
+  },
+  {
+    name: "Сложные тексты",
+    sample:
+      "Repeated requests may cause duplicate operations, so this behavior should only be enabled when the server can safely handle them.",
+  },
+];
+
+function prefersReducedMotion(): boolean {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
+/**
+ * Scroll reveals, once per element and in reading order.
+ * Sections rise into place as they enter the viewport. Tagline words switch from the muted
+ * tone to full colour one by one as they cross a line at 65% of the viewport height.
+ * Anything above a revealed element is revealed too, so jumping to an anchor never leaves
+ * earlier content hidden.
+ */
+function useScrollReveal(
+  root: RefObject<HTMLElement | null>,
+  tagline: RefObject<HTMLElement | null>,
+) {
+  useEffect(() => {
+    const sections = Array.from(root.current?.querySelectorAll<HTMLElement>(".reveal") ?? []);
+    const words = Array.from(
+      tagline.current?.querySelectorAll<HTMLElement>(".tagline-word") ?? [],
+    );
+    if (prefersReducedMotion() || typeof IntersectionObserver === "undefined") {
+      sections.forEach((section) => section.classList.add("is-visible"));
+      words.forEach((word) => word.classList.add("is-on"));
+      return;
+    }
+
+    let wordsOn = 0;
+    function showWordsThrough(last: number) {
+      let step = 0;
+      for (; wordsOn <= last && wordsOn < words.length; wordsOn += 1) {
+        const word = words[wordsOn];
+        if (word === undefined) continue;
+        word.style.transitionDelay = `${step * 60}ms`;
+        word.classList.add("is-on");
+        step += 1;
+      }
+    }
+
+    let sectionsOn = 0;
+    const sectionObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const index = sections.indexOf(entry.target as HTMLElement);
+          for (; sectionsOn <= index; sectionsOn += 1) {
+            sections[sectionsOn]?.classList.add("is-visible");
+          }
+          const taglineEl = tagline.current;
+          if (
+            taglineEl !== null &&
+            taglineEl.compareDocumentPosition(entry.target) & Node.DOCUMENT_POSITION_FOLLOWING
+          ) {
+            showWordsThrough(words.length - 1);
+          }
+        }
+      },
+      { rootMargin: "0px 0px -10% 0px" },
+    );
+    const wordObserver = new IntersectionObserver(
+      (entries) => {
+        const crossed = entries
+          .filter((entry) => entry.isIntersecting)
+          .map((entry) => words.indexOf(entry.target as HTMLElement));
+        if (crossed.length > 0) showWordsThrough(Math.max(...crossed));
+      },
+      { rootMargin: "0px 0px -35% 0px", threshold: 1 },
+    );
+    sections.forEach((section) => sectionObserver.observe(section));
+    words.forEach((word) => wordObserver.observe(word));
+    return () => {
+      sectionObserver.disconnect();
+      wordObserver.disconnect();
+    };
+  }, [root, tagline]);
+}
 
 function Demo() {
   const parts = useMemo(() => DEMO_TEXT.match(/[A-Za-z]+|[^A-Za-z]+/g) ?? [], []);
@@ -95,7 +195,9 @@ function Demo() {
 
 export function Landing({ busy, error, onStart, onLogin }: LandingProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const taglineRef = useRef<HTMLParagraphElement>(null);
   const [origin, setOrigin] = useState<CtaOrigin>("hero");
+  useScrollReveal(rootRef, taglineRef);
 
   function start(from: CtaOrigin) {
     setOrigin(from);
@@ -125,6 +227,14 @@ export function Landing({ busy, error, onStart, onLogin }: LandingProps) {
             </span>
             English for Developers
           </a>
+          <div className="nav-links title-4">
+            <a className="nav-link" href="#how">
+              Как это работает
+            </a>
+            <a className="nav-link" href="#levels">
+              Уровни
+            </a>
+          </div>
           <button
             className="btn btn-ghost btn-sm button-sm"
             type="button"
@@ -192,6 +302,162 @@ export function Landing({ busy, error, onStart, onLogin }: LandingProps) {
               </div>
             </div>
             <Demo />
+          </div>
+        </section>
+
+        <section className="section section-muted" aria-labelledby="problem-title">
+          <div className="container reveal">
+            <div className="section-head">
+              <p className="caption-3 muted">Почему не обычный тест</p>
+              <h2 id="problem-title" className="heading-2">
+                Тест уровня проверяет грамматику. Документация проверяет другое
+              </h2>
+            </div>
+            <div className="grid-2">
+              <article className="tile">
+                <p className="caption-3 muted">Обычный тест</p>
+                <h3 className="title-1">Времена глаголов, артикли, эссе о хобби</h3>
+                <p className="body-3 muted">
+                  Буква уровня говорит мало о том, поймёте ли вы раздел про установку или
+                  описание параметра функции.
+                </p>
+              </article>
+              <article className="tile tile-dark">
+                <p className="caption-3">Здесь</p>
+                <h3 className="title-1">Тексты о файлах, установке, параметрах и запросах</h3>
+                <p className="body-3">
+                  Вы отмечаете слова, которые не поняли в контексте. Рекомендация опирается на
+                  то, что вы прочитали, а не на абстрактные задания.
+                </p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section className="section" aria-labelledby="benefits-title">
+          <div className="container reveal">
+            <div className="section-head">
+              <h2 id="benefits-title" className="heading-2">
+                Что вы получаете за несколько минут
+              </h2>
+            </div>
+            <div className="grid-4">
+              <article className="tile tile-sm">
+                <Folder size={28} strokeWidth={1.5} />
+                <h3 className="title-2">Тексты из рабочего контекста</h3>
+                <p className="body-6 muted">
+                  Установка, параметры функций, повторные запросы. Слова, которые вы встретите
+                  завтра в README.
+                </p>
+              </article>
+              <article className="tile tile-sm">
+                <Clock size={28} strokeWidth={1.5} />
+                <h3 className="title-2">Короткий подбор</h3>
+                <p className="body-6 muted">
+                  От двух до четырёх текстов. Если первый оказался трудным, следующий будет
+                  проще.
+                </p>
+              </article>
+              <article className="tile tile-sm">
+                <Sliders size={28} strokeWidth={1.5} />
+                <h3 className="title-2">Решение остаётся за вами</h3>
+                <p className="body-6 muted">
+                  Рекомендация не окончательная. Не согласны, выберите другую сложность одним
+                  нажатием.
+                </p>
+              </article>
+              <article className="tile tile-sm">
+                <LockOpen size={28} strokeWidth={1.5} />
+                <h3 className="title-2">Без регистрации</h3>
+                <p className="body-6 muted">
+                  Аккаунт понадобится, только если захотите сохранить результат и открыть его
+                  позже.
+                </p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section className="section" aria-label="Главная мысль">
+          <div className="container">
+            <p ref={taglineRef} className="heading-1 tagline">
+              {TAGLINE.split(" ").map((word, index) => (
+                <span key={index}>
+                  <span className="tagline-word">{word}</span>{" "}
+                </span>
+              ))}
+            </p>
+          </div>
+        </section>
+
+        <section id="how" className="section section-muted" aria-labelledby="how-title">
+          <div className="container reveal">
+            <div className="section-head">
+              <p className="caption-3 muted">Как это работает</p>
+              <h2 id="how-title" className="heading-2">
+                Три шага до рекомендации
+              </h2>
+            </div>
+            <ol className="grid-3">
+              <li className="tile">
+                <span className="step-number title-4" aria-hidden="true">
+                  1
+                </span>
+                <h3 className="title-1">Прочитайте короткий текст</h3>
+                <p className="body-6 muted">
+                  Первый фрагмент простой: про файлы и сохранение. Дальше сложность меняется по
+                  вашим ответам.
+                </p>
+              </li>
+              <li className="tile">
+                <span className="step-number title-4" aria-hidden="true">
+                  2
+                </span>
+                <h3 className="title-1">Отметьте незнакомые слова</h3>
+                <p className="body-6 muted">
+                  Нажмите на слова, значение которых непонятно в этом контексте. Всё понятно,
+                  выберите «Все слова знакомы».
+                </p>
+              </li>
+              <li className="tile">
+                <span className="step-number title-4" aria-hidden="true">
+                  3
+                </span>
+                <h3 className="title-1">Получите рекомендацию</h3>
+                <p className="body-6 muted">
+                  Один из четырёх уровней сложности с объяснением, почему именно он. Результат
+                  можно сохранить в аккаунте.
+                </p>
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <section id="levels" className="section" aria-labelledby="levels-title">
+          <div className="container reveal">
+            <div className="section-head">
+              <p className="caption-3 muted">Четыре уровня</p>
+              <h2 id="levels-title" className="heading-2">
+                Так выглядят тексты на каждом уровне
+              </h2>
+              <p className="body-3 muted">
+                Это рабочие названия ступеней, а не уровни CEFR. Мы не выдаём сертификат, а
+                подсказываем, с чего удобнее начать.
+              </p>
+            </div>
+            <div className="grid-4">
+              {LEVELS.map((level, index) => (
+                <article key={level.name} className="level-card">
+                  <div className="level-card-head">
+                    <p className="caption-3 muted">Уровень {index + 1}</p>
+                    <h3 className="title-2">{level.name}</h3>
+                  </div>
+                  <p className="level-card-sample body-6" lang="en">
+                    {level.sample}
+                  </p>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
       </main>

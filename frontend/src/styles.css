@@ -862,6 +862,114 @@ a {
   background: var(--ink);
 }
 
+.section-muted {
+  background: var(--surface);
+}
+
+.section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 680px;
+  margin-bottom: 48px;
+}
+
+.grid-2,
+.grid-3,
+.grid-4 {
+  display: grid;
+  gap: 24px;
+  padding: 0;
+  list-style: none;
+}
+
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg);
+}
+
+.tile-sm {
+  gap: 12px;
+  padding: 24px;
+}
+
+.tile-dark {
+  color: #ffffff;
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.tile-dark .caption-3 { color: #bdbdb8; }
+.tile-dark .body-3 { color: #d4d4cf; }
+
+.step-number {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: #ffffff;
+  background: var(--ink);
+}
+
+.level-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.level-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 16px 0;
+}
+
+.level-card-sample {
+  flex-grow: 1;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.tagline {
+  max-width: 880px;
+}
+
+.tagline-word {
+  opacity: 0.3;
+  transition: opacity 600ms var(--ease);
+}
+
+.tagline-word.is-on {
+  opacity: 1;
+}
+
+/* Scroll reveal: sections rise into place once. */
+.reveal {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 700ms var(--ease), transform 700ms var(--ease);
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
 @media (max-width: 720px) {
   .heading-1 { font-size: 36px; line-height: 40px; }
   .heading-2,
@@ -898,6 +1006,17 @@ a {
   .demo-text { font-size: 18px; line-height: 32px; }
   .nav-links,
   .nav-cta { display: none; }
+}
+
+@media (max-width: 1024px) {
+  .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .tile { padding: 24px; }
+  .grid-2,
+  .grid-3,
+  .grid-4 { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {
