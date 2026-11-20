@@ -662,6 +662,29 @@ a {
   gap: 24px;
 }
 
+/* Account form */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 16px;
+  line-height: 24px;
+  transition: border-color 300ms var(--ease);
+}
+
+.input:hover:not(:disabled) { border-color: #b5b5ae; }
+.input[aria-invalid="true"] { border-color: #c2462a; }
+.field-error { color: var(--danger); font-weight: 500; }
+
 @media (max-width: 720px) {
   .heading-1 { font-size: 36px; line-height: 40px; }
   .heading-2,
