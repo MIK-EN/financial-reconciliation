@@ -27,6 +27,14 @@ async function registerCompletedResult(page: Page, username: string) {
   await expect(page.getByText(`Результат сохранён в аккаунте ${username}`)).toBeVisible();
 }
 
+async function logout(page: Page) {
+  const loggedOut = page.waitForResponse(
+    (response) => response.url().includes("/api/v1/auth/logout") && response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Выйти" }).click();
+  await loggedOut;
+}
+
 test("guest completes the simplified onboarding route", async ({ page }) => {
   await page.goto("/");
 
@@ -179,7 +187,7 @@ test("login keeps a guest result separate until explicit claim", async ({ page }
   const username = `e2e_${Date.now()}`;
   await completeSimplifiedRoute(page);
   await registerCompletedResult(page, username);
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
 
   await completeSimplifiedRoute(page);
   await page.getByRole("button", { name: "Войти" }).click();
