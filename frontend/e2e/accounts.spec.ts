@@ -21,6 +21,14 @@ async function registerCompletedResult(page: Page, username: string) {
   await expect(page.getByText(`Результат сохранён в аккаунте ${username}`)).toBeVisible();
 }
 
+async function logout(page: Page) {
+  const loggedOut = page.waitForResponse(
+    (response) => response.url().includes("/api/v1/auth/logout") && response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Выйти" }).click();
+  await loggedOut;
+}
+
 async function login(page: Page, username: string) {
   await page.getByRole("button", { name: "Войти" }).click();
   await page.getByLabel("Логин").fill(username);
@@ -33,7 +41,7 @@ test("register, log out and log in again restores the saved result", async ({ pa
   await completeSimplifiedRoute(page);
   await registerCompletedResult(page, username);
 
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
   await login(page, username);
 
   await expect(page.getByText(`Результат сохранён в аккаунте ${username}`)).toBeVisible();
@@ -79,7 +87,7 @@ test("503 on claim shows the unavailable message and a retry succeeds", async ({
   const username = `e2e_${Date.now()}_claim503`;
   await completeSimplifiedRoute(page);
   await registerCompletedResult(page, username);
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
 
   await completeSimplifiedRoute(page);
   await login(page, username);
@@ -111,7 +119,7 @@ test("410 on claim shows a generic error and nothing is saved", async ({ page })
   const username = `e2e_${Date.now()}_claim410`;
   await completeSimplifiedRoute(page);
   await registerCompletedResult(page, username);
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await logout(page);
 
   await completeSimplifiedRoute(page);
   await login(page, username);

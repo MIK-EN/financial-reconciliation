@@ -1,0 +1,47 @@
+# VPS TLS front for the production stack.
+#
+# Adds a Caddy container in front of the nginx proxy: Caddy terminates HTTPS
+# with an automatic Let's Encrypt certificate and forwards to proxy:80.
+#
+# Usage (from the repository root):
+#   docker compose --env-file .env.production -f deploy/compose.production.yaml -f deploy/compose.vps.yaml ...
+
+name: english-for-developers-prod
+
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      proxy:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is required}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      default:
+        ipv4_address: 172.30.50.10
+
+  # Override only to mount the VPS trusted-proxies list; compose merges the
+  # volume sequence by appending, so the proxy keeps its ports and everything
+  # else from compose.production.yaml.
+  proxy:
+    volumes:
+      - ./trusted-proxies.vps.conf:/etc/nginx/trusted-proxies.conf:ro
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.50.0/24
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,16 @@
+# TLS front for the production stack: Caddy terminates HTTPS with an
+# automatic Let's Encrypt certificate for {$DOMAIN}.
+#
+# No `log` directive on purpose: access logs would contain client IPs.
+# No `trusted_proxies` directive on purpose: Caddy is the first hop, so it
+# already trusts the real TCP peer and overwrites X-Forwarded-For with it.
+{$DOMAIN} {
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy proxy:80
+}
+
+# www redirects to the apex domain; Caddy issues a certificate for it too,
+# so its A record must point to the VPS as well.
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
