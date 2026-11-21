@@ -1,0 +1,28 @@
+# Scheduled jobs for the "English for Developers" production stack.
+#
+# Install with:
+#   sudo install -m 644 deploy/vps/efd.cron /etc/cron.d/english-for-developers
+#
+# Before installing, replace:
+#   deploy                      -> the real deployment user
+#   /opt/english-for-developers -> the real checkout path
+#
+# The deployment user must be in the "docker" group (to reach the Docker
+# daemon) and own /var/backups/english-for-developers (the backup target).
+# It must also be able to append to /var/log/efd-jobs.log; create it once,
+# for example:
+#   sudo install -m 640 -o deploy -g adm /dev/null /var/log/efd-jobs.log
+#
+# Times are server local time, which is UTC on the VPS.
+#
+# Backup runs BEFORE cleanup on purpose: the 03:15 dump captures the state
+# before the 03:45 session cleanup removes anything.
+#
+# cron.d files must be owned by root, must not be group/world writable, and
+# must not contain a dot in the filename.
+#
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+15 3 * * * deploy /opt/english-for-developers/scripts/vps-job.sh backup >> /var/log/efd-jobs.log 2>&1
+45 3 * * * deploy /opt/english-for-developers/scripts/vps-job.sh cleanup >> /var/log/efd-jobs.log 2>&1
