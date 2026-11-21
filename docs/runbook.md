@@ -360,6 +360,8 @@ docker compose --env-file .env.production -f deploy/compose.production.yaml -f d
 docker compose --env-file .env.production -f deploy/compose.production.yaml -f deploy/compose.vps.yaml up -d
 ```
 
+После обновления кода на сервере выполните `dc build`, затем `dc up -d --wait`. Если вы меняли смонтированный файл (`deploy/Caddyfile`), дополнительно перезапустите контейнер: `dc restart caddy`, иначе он продолжит читать старую версию файла.
+
 Если стек уже был запущен без VPS-override, перед первым `up` с ним выполните `down`: override меняет подсеть сети `default` на `172.30.50.0/24`, и переключение работающего стека ломает сеть. Используйте именно `down`, а не `down -v`: `-v` удаляет том `postgres_data` с базой. На свежем сервере просто начните сразу с двух файлов.
 
 ```bash
