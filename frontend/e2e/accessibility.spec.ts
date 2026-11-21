@@ -11,7 +11,7 @@ test("keyboard completes the route on a mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
-  const start = page.getByRole("button", { name: "Начать" });
+  const start = page.getByRole("button", { name: "Подобрать сложность" }).first();
   await start.focus();
   await page.keyboard.press("Enter");
 

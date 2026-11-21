@@ -13,8 +13,9 @@ import {
   submitAnswer,
   updateSelection,
 } from "./api";
+import { FlowShell, LoadingScreen } from "./components/FlowShell";
+import { Landing } from "./components/Landing";
 import { ResultScreen } from "./components/ResultScreen";
-import { StartScreen } from "./components/StartScreen";
 import { TextStep } from "./components/TextStep";
 import { AccountForm, type AccountMode } from "./components/AccountForm";
 import { clearDraft } from "./draft";
@@ -239,26 +240,24 @@ export function App() {
   }
 
   if (loading) {
-    return (
-      <main className="screen loading-screen" aria-live="polite">
-        Загружаем…
-      </main>
-    );
+    return <LoadingScreen />;
   }
   if (run === null) {
     if (accountMode === "login") {
       return (
-        <AccountForm
-          mode="login"
-          busy={busy}
-          error={accountError}
-          onSubmit={handleLogin}
-          onCancel={() => setAccountMode(null)}
-        />
+        <FlowShell busy={busy}>
+          <AccountForm
+            mode="login"
+            busy={busy}
+            error={accountError}
+            onSubmit={handleLogin}
+            onCancel={() => setAccountMode(null)}
+          />
+        </FlowShell>
       );
     }
     return (
-      <StartScreen
+      <Landing
         busy={busy}
         error={error}
         onStart={() => void handleStart()}
@@ -281,38 +280,39 @@ export function App() {
     );
   }
   return (
-    <>
-      <ResultScreen
-        run={run}
-        busy={busy}
-        error={error}
-        account={account}
-        accountOfferDismissed={accountOfferDismissed || accountMode !== null}
-        onSelectLevel={(level) => void handleSelection(level)}
-        onRegister={() => {
-          setAccountError(null);
-          setAccountMode("register");
-        }}
-        onLogin={() => {
-          setAccountError(null);
-          setAccountMode("login");
-        }}
-        onLogout={() => void handleLogout()}
-        onClaim={() => void handleClaim()}
-        onDismissAccountOffer={() => {
-          setAccountOfferDismissed(true);
-          setAccountMode(null);
-        }}
-      />
-      {accountMode === null ? null : (
-        <AccountForm
-          mode={accountMode}
-          busy={busy}
-          error={accountError}
-          onSubmit={accountMode === "register" ? handleRegister : handleLogin}
-          onCancel={() => setAccountMode(null)}
-        />
-      )}
-    </>
+    <ResultScreen
+      run={run}
+      busy={busy}
+      error={error}
+      account={account}
+      accountOfferDismissed={accountOfferDismissed}
+      accountForm={
+        accountMode === null ? null : (
+          <AccountForm
+            key={accountMode}
+            mode={accountMode}
+            busy={busy}
+            error={accountError}
+            onSubmit={accountMode === "register" ? handleRegister : handleLogin}
+            onCancel={() => setAccountMode(null)}
+          />
+        )
+      }
+      onSelectLevel={(level) => void handleSelection(level)}
+      onRegister={() => {
+        setAccountError(null);
+        setAccountMode("register");
+      }}
+      onLogin={() => {
+        setAccountError(null);
+        setAccountMode("login");
+      }}
+      onLogout={() => void handleLogout()}
+      onClaim={() => void handleClaim()}
+      onDismissAccountOffer={() => {
+        setAccountOfferDismissed(true);
+        setAccountMode(null);
+      }}
+    />
   );
 }

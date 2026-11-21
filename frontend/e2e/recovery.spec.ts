@@ -1,8 +1,14 @@
 import { expect, type Page, test } from "@playwright/test";
 
+function levelRadio(page: Page, name: string) {
+  return page
+    .getByRole("group", { name: "Выбранная сложность" })
+    .getByRole("radio", { name });
+}
+
 async function reachSecondText(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
   for (const word of ["file", "create", "new"]) {
     await page.getByRole("button", { name: word, exact: true }).first().click();
   }
@@ -64,22 +70,18 @@ test("reload on the result screen keeps the result", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Рекомендуем начать с: Основы" }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Начать" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Подобрать сложность" }).first()).toHaveCount(0);
 });
 
 test("reload keeps a changed starting level", async ({ page }) => {
   await completeSimplifiedRoute(page);
 
-  const level = page.getByRole("combobox", { name: "Выбранная сложность" });
-  await level.selectOption("basic_docs");
-  await expect(level).toHaveValue("basic_docs");
-  await expect(page.getByText("Выбрано: Базовая документация")).toBeVisible();
+  await levelRadio(page, "Базовая документация").click();
+  await expect(levelRadio(page, "Базовая документация")).toBeChecked();
 
   await page.reload();
 
-  await expect(page.getByRole("combobox", { name: "Выбранная сложность" })).toHaveValue(
-    "basic_docs",
-  );
+  await expect(levelRadio(page, "Базовая документация")).toBeChecked();
 });
 
 test("browser back and forward return to the server step", async ({ page }) => {
@@ -99,7 +101,7 @@ test("browser back and forward return to the server step", async ({ page }) => {
 
 async function openFirstTextAndSelect(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
   for (const word of ["file", "create", "new"]) {
     await page.getByRole("button", { name: word, exact: true }).first().click();
   }

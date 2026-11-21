@@ -1,8 +1,14 @@
 import { expect, type Page, test } from "@playwright/test";
 
+function levelRadio(page: Page, name: string) {
+  return page
+    .getByRole("group", { name: "Выбранная сложность" })
+    .getByRole("radio", { name });
+}
+
 async function completeSimplifiedRoute(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
   for (const word of ["file", "create", "new"]) {
     await page.getByRole("button", { name: word, exact: true }).first().click();
   }
@@ -25,9 +31,9 @@ test("guest completes the simplified onboarding route", async ({ page }) => {
   await page.goto("/");
 
   await expect(
-    page.getByRole("heading", { name: "Подберём стартовую сложность" }),
+    page.getByRole("heading", { name: "С каких текстов начинать читать документацию?" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
 
   await expect(
     page.getByRole("heading", { name: "Нажмите на слова, которые вам незнакомы" }),
@@ -59,7 +65,7 @@ test("guest completes the simplified onboarding route", async ({ page }) => {
 
 test("guest completes the four-text route", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
 
   for (const ordinal of [1, 2, 3, 4]) {
     await expect(page.getByText(`Текст ${ordinal}`, { exact: true })).toBeVisible();
@@ -73,7 +79,7 @@ test("guest completes the four-text route", async ({ page }) => {
 
 test("guest completes the simplified difficult route", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
 
   for (const word of ["file", "create", "new"]) {
     await page.getByRole("button", { name: word, exact: true }).first().click();
@@ -95,7 +101,7 @@ test("guest completes the simplified difficult route", async ({ page }) => {
 
 test("guest can deselect a repeated word before submitting", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
 
   const fileWords = page.getByRole("button", { name: "file", exact: true });
   await fileWords.first().click();
@@ -120,11 +126,10 @@ test("guest can deselect a repeated word before submitting", async ({ page }) =>
 test("guest changes the selected starting level", async ({ page }) => {
   await completeSimplifiedRoute(page);
 
-  const level = page.getByRole("combobox", { name: "Выбранная сложность" });
-  await expect(level).toHaveValue("foundations");
-  await level.selectOption("basic_docs");
-  await expect(level).toHaveValue("basic_docs");
-  await expect(page.getByText("Выбрано: Базовая документация")).toBeVisible();
+  await expect(levelRadio(page, "Основы")).toBeChecked();
+  await levelRadio(page, "Базовая документация").click();
+  await expect(levelRadio(page, "Базовая документация")).toBeChecked();
+  await expect(levelRadio(page, "Основы")).not.toBeChecked();
   await expect(
     page.getByRole("heading", { name: "Рекомендуем начать с: Основы" }),
   ).toBeVisible();
@@ -189,7 +194,7 @@ test("login keeps a guest result separate until explicit claim", async ({ page }
 
 test("draft selection survives a reload", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
 
   const fileWords = page.getByRole("button", { name: "file", exact: true });
   await fileWords.first().click();
@@ -215,7 +220,7 @@ test("unavailable session storage does not block onboarding", async ({ page }) =
     }
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
 
   const fileWords = page.getByRole("button", { name: "file", exact: true });
   await fileWords.first().click();
@@ -236,7 +241,7 @@ test("network retry keeps the selection and original answer", async ({ page }) =
     else await route.continue();
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
 
   for (const word of ["file", "create", "new"]) {
     await page.getByRole("button", { name: word, exact: true }).first().click();
@@ -264,7 +269,7 @@ test("conflict reloads the server-authoritative step", async ({ page }) => {
     });
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Начать" }).click();
+  await page.getByRole("button", { name: "Подобрать сложность" }).first().click();
 
   for (const word of ["file", "create", "new"]) {
     await page.getByRole("button", { name: word, exact: true }).first().click();
@@ -280,10 +285,14 @@ test("mobile guest can start and select a word with the keyboard", async ({ page
   await page.goto("/");
 
   // Wait for the app to render before tabbing; otherwise Tab fires before the button exists.
-  await expect(page.getByRole("button", { name: "Начать" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Подобрать сложность" }).first()).toBeVisible();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Начать" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Перейти к содержанию" })).toBeFocused();
   await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Подобрать сложность" }).first()).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("Текст 1", { exact: true })).toBeVisible();
   const firstWord = page.getByRole("button", { name: "You", exact: true });
   await firstWord.focus();
   await page.keyboard.press("Space");
