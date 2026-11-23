@@ -18,6 +18,13 @@ class TelegramNonceResponse(BaseModel):
     client_id: str
 
 
+class TelegramSignInRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
+
+    id_token: str = Field(min_length=1, max_length=8192, repr=False)
+    run_id: UUID | None = None
+
+
 class BrowserSessionResponse(BaseModel):
     session_id: UUID
     session_type: str
