@@ -170,7 +170,7 @@
 - [x] Добавить PyJWT[crypto] отдельной порцией вместе с lock-файлом.
 - [x] Проверка `id_token`: подпись RS256, iss, aud, exp/iat, обязательные claims, nonce; неверный токен и недоступность ключей — разные ошибки. Unit-тесты на локальных RSA-ключах без сети.
 - [x] Миграция `0003`: `auth_identities`, nullable логин и пароль с CHECK, nonce в `browser_sessions`; проверка схемы и `alembic check`.
-- [ ] `POST /auth/telegram/nonce`: выдача и замена nonce, Origin/CSRF, выключенный Telegram.
+- [x] `POST /auth/telegram/nonce`: выдача и замена nonce, Origin/CSRF, выключенный Telegram.
 - [ ] `POST /auth/telegram`: вход, регистрация с привязкой run, все отказы, повтор и гонка, отсутствие токена в логах; интеграционные тесты на PostgreSQL.
 - [ ] Frontend: кнопка Telegram в форме аккаунта, контекст без логина, лимит nginx и CSP для библиотеки Telegram, e2e с подменённым ответом.
 - [ ] Runbook (BotFather, `TELEGRAM_CLIENT_ID`), README, STATUS; проверка доступа к `oauth.telegram.org` с VPS и ручной вход на сайте.

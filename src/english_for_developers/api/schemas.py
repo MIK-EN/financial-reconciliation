@@ -13,6 +13,11 @@ class EmptyBody(BaseModel):
     model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
 
 
+class TelegramNonceResponse(BaseModel):
+    nonce: str
+    client_id: str
+
+
 class BrowserSessionResponse(BaseModel):
     session_id: UUID
     session_type: str

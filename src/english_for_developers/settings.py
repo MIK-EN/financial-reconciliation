@@ -10,6 +10,7 @@ class Settings:
     expected_origin: str = "http://testserver"
     environment: str = "development"
     session_ttl_days: int = 7
+    telegram_client_id: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -17,6 +18,7 @@ class Settings:
             database_url=os.environ.get("DATABASE_URL", ""),
             expected_origin=os.environ.get("EXPECTED_ORIGIN", "http://testserver"),
             environment=os.environ.get("APP_ENV", "development"),
+            telegram_client_id=os.environ.get("TELEGRAM_CLIENT_ID", "").strip(),
         )
 
     @property

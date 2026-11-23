@@ -7,17 +7,45 @@ from sqlalchemy.orm import Session
 
 from english_for_developers.accounts.service import login, logout, register
 from english_for_developers.accounts.sessions import session_cookie_options
+from english_for_developers.accounts.telegram_login import issue_telegram_nonce
 from english_for_developers.api.browser_routes import _require_allowed_origin
 from english_for_developers.api.dependencies import get_db, get_now, get_settings
+from english_for_developers.api.errors import ApiError
 from english_for_developers.api.schemas import (
     AccountContext,
     EmptyBody,
     LoginRequest,
     RegistrationRequest,
+    TelegramNonceResponse,
 )
 from english_for_developers.settings import Settings
 
 router = APIRouter(prefix="/api/v1/auth")
+
+
+def _require_telegram_login(
+    origin: str | None = Header(default=None),
+    settings: Settings = Depends(get_settings),  # noqa: B008
+) -> Settings:
+    _require_allowed_origin(origin, settings.expected_origin)
+    if settings.telegram_client_id == "":
+        raise ApiError(404, "telegram_disabled", "Telegram login is disabled")
+    return settings
+
+
+@router.post("/telegram/nonce", response_model=TelegramNonceResponse)
+def create_telegram_nonce(
+    body: EmptyBody,
+    request: Request,
+    csrf_token: str | None = Header(default=None, alias="X-CSRF-Token"),
+    settings: Settings = Depends(_require_telegram_login),  # noqa: B008
+    db: Session = Depends(get_db),  # noqa: B008
+    now: datetime = Depends(get_now),  # noqa: B008
+) -> TelegramNonceResponse:
+    nonce = issue_telegram_nonce(
+        db, request.cookies.get(settings.session_cookie_name), csrf_token, now
+    )
+    return TelegramNonceResponse(nonce=nonce, client_id=settings.telegram_client_id)
 
 
 @router.post("/logout", status_code=204)

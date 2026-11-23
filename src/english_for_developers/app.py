@@ -24,7 +24,13 @@ def _requires_no_store(request: Request) -> bool:
             (request.method == "PUT" and request.url.path.endswith("/selection"))
             or (request.method == "POST" and request.url.path.endswith("/claim"))
         )
-    ) or request.url.path in {"/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/logout"}
+    ) or request.url.path in {
+        "/api/v1/auth/register",
+        "/api/v1/auth/login",
+        "/api/v1/auth/logout",
+        "/api/v1/auth/telegram/nonce",
+        "/api/v1/auth/telegram",
+    }
 
 
 def create_app() -> FastAPI:
