@@ -167,7 +167,7 @@
 
 **Зависит от:** 5, 6. **Создать:** `accounts/telegram.py`, миграцию `0003`, тесты. **Обновить:** модели, настройки, `accounts/service.py`, `api/auth_routes.py`, схемы, frontend (кнопка и форма результата), nginx (лимит и CSP), runbook и README. **Зависимость:** PyJWT с `crypto`.
 
-- [ ] Добавить PyJWT[crypto] отдельной порцией вместе с lock-файлом.
+- [x] Добавить PyJWT[crypto] отдельной порцией вместе с lock-файлом.
 - [ ] Проверка `id_token`: подпись RS256, iss, aud, exp/iat, обязательные claims, nonce; неверный токен и недоступность ключей — разные ошибки. Unit-тесты на локальных RSA-ключах без сети.
 - [ ] Миграция `0003`: `auth_identities`, nullable логин и пароль с CHECK, nonce в `browser_sessions`; проверка схемы и `alembic check`.
 - [ ] `POST /auth/telegram/nonce`: выдача и замена nonce, Origin/CSRF, выключенный Telegram.
