@@ -1,8 +1,14 @@
 import { type FormEvent, useState } from "react";
 
-import { LockSimple, WarningCircle } from "./Icons";
+import { LockSimple, PaperPlaneTilt, WarningCircle } from "./Icons";
 
 export type AccountMode = "register" | "login";
+
+/** null hides the Telegram option entirely (Telegram login is not configured). */
+export type TelegramOption =
+  | { status: "loading" }
+  | { status: "ready"; onClick: () => void }
+  | { status: "unavailable" };
 
 interface AccountFormProps {
   mode: AccountMode;
@@ -10,6 +16,7 @@ interface AccountFormProps {
   error: string | null;
   onSubmit: (username: string, password: string) => Promise<void>;
   onCancel: () => void;
+  telegram: TelegramOption | null;
 }
 
 const USERNAME_PATTERN = /^[a-z0-9_]{3,32}$/;
@@ -38,7 +45,50 @@ function validate(mode: AccountMode, username: string, password: string): FieldE
   return errors;
 }
 
-export function AccountForm({ mode, busy, error, onSubmit, onCancel }: AccountFormProps) {
+function TelegramBlock({
+  option,
+  isRegister,
+  busy,
+}: {
+  option: TelegramOption;
+  isRegister: boolean;
+  busy: boolean;
+}) {
+  if (option.status === "unavailable") {
+    return (
+      <p className="body-6 muted" role="status">
+        Вход через Telegram сейчас недоступен. Используйте логин и пароль.
+      </p>
+    );
+  }
+  return (
+    <div className="stack-4">
+      <button
+        className="btn btn-secondary btn-block btn-telegram button-md"
+        type="button"
+        disabled={busy || option.status === "loading"}
+        onClick={option.status === "ready" ? option.onClick : undefined}
+      >
+        <PaperPlaneTilt />
+        {isRegister ? "Сохранить через Telegram" : "Войти через Telegram"}
+      </button>
+      <span className="caption-5 muted">
+        {isRegister
+          ? "Без логина и пароля: аккаунт будет привязан к вашему Telegram."
+          : "Для аккаунтов, созданных через Telegram."}
+      </span>
+    </div>
+  );
+}
+
+export function AccountForm({
+  mode,
+  busy,
+  error,
+  onSubmit,
+  onCancel,
+  telegram,
+}: AccountFormProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -64,6 +114,12 @@ export function AccountForm({ mode, busy, error, onSubmit, onCancel }: AccountFo
             : "Войдите, чтобы открыть сохранённый результат."}
         </p>
       </div>
+      {telegram === null ? null : (
+        <>
+          <TelegramBlock option={telegram} isRegister={isRegister} busy={busy} />
+          <p className="divider caption-5">или логин и пароль</p>
+        </>
+      )}
       <p className="message message-warning body-6">
         <LockSimple />
         В первой версии нет восстановления пароля. Если вы его забудете, восстановить доступ к

@@ -5,11 +5,13 @@ import {
   type BrowserSession,
   type Level,
   type RunState,
+  type TelegramNonce,
   parseAccountContext,
   parseApiError,
   parseBrowserContext,
   parseBrowserSession,
   parseRunState,
+  parseTelegramNonce,
 } from "./types";
 
 type Decoder<T> = (value: unknown) => T;
@@ -130,6 +132,25 @@ export function login(
     method: "POST",
     headers: mutationHeaders(csrfToken),
     body: JSON.stringify(credentials),
+  });
+}
+
+export function getTelegramNonce(csrfToken: string): Promise<TelegramNonce> {
+  return requestJson("/api/v1/auth/telegram/nonce", parseTelegramNonce, {
+    method: "POST",
+    headers: mutationHeaders(csrfToken),
+    body: "{}",
+  });
+}
+
+export function signInWithTelegram(
+  csrfToken: string,
+  payload: { id_token: string; run_id: string | null },
+): Promise<AccountContext> {
+  return requestJson("/api/v1/auth/telegram", parseAccountContext, {
+    method: "POST",
+    headers: mutationHeaders(csrfToken),
+    body: JSON.stringify(payload),
   });
 }
 

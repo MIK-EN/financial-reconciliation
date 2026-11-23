@@ -6,9 +6,11 @@ import {
   createBrowserSession,
   getContext,
   getRun,
+  getTelegramNonce,
   login as loginAccount,
   logout as logoutAccount,
   register as registerAccount,
+  signInWithTelegram,
   startRun,
   submitAnswer,
   updateSelection,
@@ -17,8 +19,9 @@ import { FlowShell, LoadingScreen } from "./components/FlowShell";
 import { Landing } from "./components/Landing";
 import { ResultScreen } from "./components/ResultScreen";
 import { TextStep } from "./components/TextStep";
-import { AccountForm, type AccountMode } from "./components/AccountForm";
+import { AccountForm, type AccountMode, type TelegramOption } from "./components/AccountForm";
 import { clearDraft } from "./draft";
+import { type TelegramAuthResult, loadTelegramLibrary, openTelegramPopup } from "./telegram";
 import type { AccountContext, Level, RunState } from "./types";
 
 function errorMessage(error: unknown): string {
@@ -30,6 +33,34 @@ function errorMessage(error: unknown): string {
   }
   return "Не удалось выполнить действие. Попробуйте ещё раз.";
 }
+
+function telegramErrorMessage(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    const code = error.body?.code;
+    if (code === "registration_conflict") {
+      return "Аккаунта с этим Telegram пока нет. Пройдите подбор сложности и сохраните результат через Telegram.";
+    }
+    if (code === "identity_conflict") {
+      return "Этот Telegram только что привязан к аккаунту. Нажмите «Войти через Telegram» ещё раз.";
+    }
+    if (code === "already_authenticated") return "Вы уже вошли в аккаунт. Обновите страницу.";
+    if (code === "telegram_unavailable") {
+      return "Telegram сейчас недоступен. Попробуйте позже или войдите по логину и паролю.";
+    }
+    if (error.status === 401) return "Не удалось подтвердить вход через Telegram. Попробуйте ещё раз.";
+  }
+  return errorMessage(error);
+}
+
+type TelegramState =
+  | { status: "off" | "loading" | "unavailable" }
+  | {
+      status: "ready";
+      api: Awaited<ReturnType<typeof loadTelegramLibrary>>;
+      clientId: string;
+      nonce: string;
+      csrfToken: string;
+    };
 
 function keepNewestRun(current: RunState | null, candidate: RunState): RunState {
   if (current?.id === candidate.id && current.revision > candidate.revision) {
@@ -48,6 +79,48 @@ export function App() {
   const [accountMode, setAccountMode] = useState<AccountMode | null>(null);
   const [accountOfferDismissed, setAccountOfferDismissed] = useState(false);
   const [run, setRun] = useState<RunState | null>(null);
+  const [telegram, setTelegram] = useState<TelegramState>({ status: "off" });
+  const [telegramAttempt, setTelegramAttempt] = useState(0);
+
+  // Prepare Telegram while the account form is open: the nonce and the library
+  // must be ready before the click, otherwise the browser blocks the popup.
+  useEffect(() => {
+    if (accountMode === null) return;
+    let cancelled = false;
+
+    async function prepare() {
+      setTelegram({ status: "loading" });
+      try {
+        let csrfToken = guestCsrfToken;
+        if (csrfToken === null) {
+          const session = await createBrowserSession();
+          csrfToken = session.csrf_token;
+          if (!cancelled) setGuestCsrfToken(csrfToken);
+        }
+        const issued = await getTelegramNonce(csrfToken);
+        const api = await loadTelegramLibrary();
+        if (!cancelled) {
+          setTelegram({
+            status: "ready",
+            api,
+            clientId: issued.client_id,
+            nonce: issued.nonce,
+            csrfToken,
+          });
+        }
+      } catch (caught) {
+        if (cancelled) return;
+        const disabled = caught instanceof ApiRequestError && caught.status === 404;
+        setTelegram({ status: disabled ? "off" : "unavailable" });
+      }
+    }
+
+    void prepare();
+    return () => {
+      cancelled = true;
+    };
+    // guestCsrfToken is read once per opening; a new token must not re-issue the nonce.
+  }, [accountMode, telegramAttempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -206,6 +279,59 @@ export function App() {
     }
   }
 
+  function handleTelegramClick() {
+    if (telegram.status !== "ready") return;
+    const { api, clientId, nonce, csrfToken } = telegram;
+    setAccountError(null);
+    openTelegramPopup(api, clientId, nonce, (result) => {
+      void finishTelegramSignIn(result, csrfToken);
+    });
+  }
+
+  async function finishTelegramSignIn(result: TelegramAuthResult, csrfToken: string) {
+    if (result.id_token === undefined) {
+      if (result.error !== "popup_closed") {
+        setAccountError("Telegram не подтвердил вход. Попробуйте ещё раз.");
+      }
+      return;
+    }
+    const guestRun = run?.status === "completed" && !run.saved_to_account ? run : null;
+    setBusy(true);
+    setAccountError(null);
+    try {
+      const signedIn = await signInWithTelegram(csrfToken, {
+        id_token: result.id_token,
+        run_id: guestRun?.id ?? null,
+      });
+      setAccount(signedIn);
+      setAccountMode(null);
+      if (guestRun !== null) {
+        // A new Telegram account claims the run and revokes the guest session;
+        // an existing account leaves the guest run for an explicit claim.
+        const refreshed = await getRun(guestRun.id);
+        if (refreshed.status === "completed" && refreshed.saved_to_account) {
+          setGuestCsrfToken(null);
+        }
+        setRun((current) => keepNewestRun(current, refreshed));
+      } else if (run === null && signedIn.current_run_id !== null) {
+        const restored = await getRun(signedIn.current_run_id);
+        setRun((current) => keepNewestRun(current, restored));
+      }
+    } catch (caught) {
+      setAccountError(telegramErrorMessage(caught));
+      setTelegramAttempt((attempt) => attempt + 1); // Fetch a fresh nonce for the retry.
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const telegramOption: TelegramOption | null =
+    telegram.status === "off"
+      ? null
+      : telegram.status === "ready"
+        ? { status: "ready", onClick: handleTelegramClick }
+        : { status: telegram.status };
+
   async function handleLogout() {
     if (account === null) return;
     setBusy(true);
@@ -252,6 +378,7 @@ export function App() {
             error={accountError}
             onSubmit={handleLogin}
             onCancel={() => setAccountMode(null)}
+            telegram={telegramOption}
           />
         </FlowShell>
       );
@@ -295,6 +422,7 @@ export function App() {
             error={accountError}
             onSubmit={accountMode === "register" ? handleRegister : handleLogin}
             onCancel={() => setAccountMode(null)}
+            telegram={telegramOption}
           />
         )
       }

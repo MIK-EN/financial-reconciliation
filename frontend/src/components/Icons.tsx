@@ -89,3 +89,10 @@ export const Sliders = (p: IconProps) => (
     <circle cx="8" cy="17" r="2" />
   </Svg>
 );
+
+export const PaperPlaneTilt = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M20.5 3.5 2.9 10.4a.6.6 0 0 0 0 1.1l7.1 2.5 2.5 7.1a.6.6 0 0 0 1.1 0L20.5 3.5Z" />
+    <path d="M20.5 3.5 10 14" />
+  </Svg>
+);

@@ -121,7 +121,11 @@ export function ResultScreen({
       {run.saved_to_account && account !== null ? (
         <section className="message message-success body-6" aria-label="Аккаунт">
           <Check />
-          <p style={{ flexGrow: 1 }}>Результат сохранён в аккаунте {account.username}</p>
+          <p style={{ flexGrow: 1 }}>
+            {account.username === null
+              ? "Результат сохранён в аккаунте Telegram"
+              : `Результат сохранён в аккаунте ${account.username}`}
+          </p>
           <button
             className="btn btn-ghost btn-sm button-sm"
             type="button"
@@ -135,7 +139,9 @@ export function ResultScreen({
         <section className="card-muted offer" aria-labelledby="claim-title">
           <div className="stack-4" style={{ maxWidth: 440 }}>
             <h2 id="claim-title" className="heading-6">
-              Вы вошли как {account.username}
+              {account.username === null
+                ? "Вы вошли через Telegram"
+                : `Вы вошли как ${account.username}`}
             </h2>
             <p className="body-6 muted">
               Гостевой результат останется отдельным, пока вы явно его не сохраните.

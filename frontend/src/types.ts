@@ -2,7 +2,8 @@ export type Level = "foundations" | "basic_docs" | "confident_reading" | "comple
 
 export interface AccountContext {
   user_id: string;
-  username: string;
+  /** null for accounts created through Telegram, which have no password login. */
+  username: string | null;
   csrf_token: string;
   current_run_id: string | null;
   expires_at: string;
@@ -94,10 +95,23 @@ function parseAccount(value: unknown): AccountContext {
   const data = object(value, "account");
   return {
     user_id: string(data.user_id, "account.user_id"),
-    username: string(data.username, "account.username"),
+    username: nullableString(data.username, "account.username"),
     csrf_token: string(data.csrf_token, "account.csrf_token"),
     current_run_id: nullableString(data.current_run_id, "account.current_run_id"),
     expires_at: string(data.expires_at, "account.expires_at"),
+  };
+}
+
+export interface TelegramNonce {
+  nonce: string;
+  client_id: string;
+}
+
+export function parseTelegramNonce(value: unknown): TelegramNonce {
+  const data = object(value, "telegram nonce");
+  return {
+    nonce: string(data.nonce, "telegramNonce.nonce"),
+    client_id: string(data.client_id, "telegramNonce.client_id"),
   };
 }
 
