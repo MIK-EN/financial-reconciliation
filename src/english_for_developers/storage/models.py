@@ -66,6 +66,7 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         UniqueConstraint("username", name="uq_users_username"),
+        CheckConstraint("(username IS NULL) = (password_hash IS NULL)", name="credentials_pair"),
         ForeignKeyConstraint(
             ["current_run_id", "id"],
             ["onboarding_runs.id", "onboarding_runs.user_id"],
@@ -78,9 +79,26 @@ class User(Base):
     )
 
     id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
-    username: Mapped[str] = mapped_column(String(32), nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    username: Mapped[str | None] = mapped_column(String(32))
+    password_hash: Mapped[str | None] = mapped_column(String(255))
     current_run_id: Mapped[UUID | None] = mapped_column(PostgreSQLUUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AuthIdentity(Base):
+    __tablename__ = "auth_identities"
+    __table_args__ = (
+        UniqueConstraint("provider", "subject", name="uq_auth_identities_provider_subject"),
+        CheckConstraint("provider IN ('telegram')", name="provider_valid"),
+        CheckConstraint("length(subject) > 0", name="subject_not_empty"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(16), nullable=False)
+    subject: Mapped[str] = mapped_column(String(128), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
@@ -95,6 +113,12 @@ class BrowserSession(Base):
             "(kind = 'authenticated' AND user_id IS NOT NULL)",
             name="owner_matches_kind",
         ),
+        CheckConstraint(
+            "(telegram_nonce_hash IS NULL AND telegram_nonce_expires_at IS NULL) OR "
+            "(telegram_nonce_hash IS NOT NULL AND telegram_nonce_expires_at IS NOT NULL "
+            "AND length(telegram_nonce_hash) = 64 AND kind = 'anonymous')",
+            name="telegram_nonce_valid",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True)
@@ -105,6 +129,8 @@ class BrowserSession(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    telegram_nonce_hash: Mapped[str | None] = mapped_column(String(64))
+    telegram_nonce_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class OnboardingRun(Base):

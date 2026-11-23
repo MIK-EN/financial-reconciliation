@@ -17,6 +17,7 @@ from english_for_developers.storage.models import (
 )
 
 EXPECTED_TABLES = {
+    "auth_identities",
     "browser_sessions",
     "content_bundles",
     "content_settings",
@@ -26,7 +27,7 @@ EXPECTED_TABLES = {
 }
 
 
-def test_migration_creates_the_six_product_tables(db_session: Session) -> None:
+def test_migration_creates_the_seven_product_tables(db_session: Session) -> None:
     database_tables = set(inspect(db_session.get_bind()).get_table_names())
     assert database_tables - {"alembic_version"} == EXPECTED_TABLES
     assert set(Base.metadata.tables) == EXPECTED_TABLES

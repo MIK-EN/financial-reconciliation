@@ -138,7 +138,7 @@ def login(
         db.add(auth)
         context = AccountContext(
             user_id=user.id,
-            username=user.username,
+            username=username,
             csrf_token=auth.csrf_secret,
             current_run_id=user.current_run_id,
             expires_at=auth.expires_at,

@@ -22,7 +22,7 @@ class BrowserSessionResponse(BaseModel):
 
 class AccountContext(BaseModel):
     user_id: UUID
-    username: str
+    username: str | None
     csrf_token: str
     current_run_id: UUID | None
     expires_at: datetime
