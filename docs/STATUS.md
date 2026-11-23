@@ -599,3 +599,11 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 - Ветка `feat/site-design` запушена; фактический CI run на `fa9c457` завершился успешно: https://github.com/MIK-EN/financial-reconciliation/actions/runs/44882821016.
 - Владелец перезагрузил VPS (`sudo reboot`): через две минуты все четыре контейнера `Up` и три `healthy` без ручных действий, cron активен и crontab сохранён, HTTPS отдаёт `HTTP/2 200`, данные и ревизия alembic на месте.
 - Остаются: срабатывание cron (лог после 03:15 UTC), проход в чистом браузере с телефона без VPN, страница подготовки к собеседованию.
+
+## Задача 11: вход через Telegram, серверная часть, 2026-11-23
+
+- Решения пользователя: Telegram OpenID Connect во всплывающем окне с проверкой `id_token` на сервере, таблица `auth_identities`, первый вход работает как регистрация. Записаны в `decisions.md`, спецификация — design §9.1, план — задача 11.
+- Ветка `feat/telegram-login` от `origin/main`, без push. Коммиты: документы, PyJWT[crypto], проверка `id_token` (`accounts/telegram.py`), миграция `0003_telegram_identities`, `POST /auth/telegram/nonce`, вход известного пользователя и регистрация с привязкой прохождения (`POST /auth/telegram`, 200/201).
+- Делегирование: все порции — Codex `gpt-6.2-sol`, в две фазы (тесты, затем код), без отказов и повторов. Оркестратор добавил один unit-тест на кеш верификатора и отформатировал тесты одной порции.
+- Проверено: полный `pytest tests` — 546 passed на PostgreSQL 17 (тестовая БД), Ruff lint/format и mypy чисто, `alembic check` без расхождений, `downgrade 0002` → `upgrade head` проходит. Покрытие веток нового кода 100%, кроме повторного выброса неожиданной `IntegrityError` в `telegram_login.py`. Мутационные проверки (подпись/алгоритм/срок, CSRF, гашение и срок nonce, отзыв guest-сессии, чужой и просроченный run, `identity_conflict`) ловятся тестами.
+- Не сделано: frontend (кнопка и библиотека Telegram, `username = null` в UI), лимит nginx и CSP для `/api/v1/auth/telegram*`, runbook/README (BotFather, `TELEGRAM_CLIENT_ID`), проверка доступа к `oauth.telegram.org` с VPS, ручной вход с настоящим ботом. Точный URL скрипта библиотеки Telegram в документации не найден — нужно взять из настроек бота в BotFather.
