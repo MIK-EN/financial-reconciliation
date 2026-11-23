@@ -368,7 +368,7 @@ def test_rejects_invalid_browser_without_changes(
     assert _snapshot(test_engine) == before
 
 
-@pytest.mark.parametrize("with_run", [False, True], ids=["without-run", "with-completed-run"])
+@pytest.mark.parametrize("with_run", [False], ids=["without-run"])
 def test_rejects_unknown_identity_without_consuming_nonce(
     telegram_client: TestClient,
     test_engine: Engine,

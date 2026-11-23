@@ -93,7 +93,7 @@ def log_in_with_telegram(
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> AccountContext:
     claims, run_id = verified
-    context, token = telegram_sign_in(
+    context, token, created = telegram_sign_in(
         db,
         claims,
         run_id,
@@ -103,6 +103,7 @@ def log_in_with_telegram(
         now,
         settings.session_ttl_days,
     )
+    response.status_code = 201 if created else 200
     options = session_cookie_options(settings)
     options["key"] = settings.auth_cookie_name
     response.set_cookie(value=token, **options)  # The transaction has committed.

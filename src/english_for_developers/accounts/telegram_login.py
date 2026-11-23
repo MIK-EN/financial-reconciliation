@@ -1,10 +1,11 @@
-"""Issue Telegram login nonces and sign in known Telegram identities."""
+"""Issue Telegram login nonces and sign in or register Telegram identities."""
 
 import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from english_for_developers.accounts.service import _require_login_guest
@@ -17,7 +18,7 @@ from english_for_developers.accounts.sessions import (
 from english_for_developers.accounts.telegram import TelegramClaims
 from english_for_developers.api.errors import ApiError
 from english_for_developers.api.schemas import AccountContext
-from english_for_developers.storage.models import AuthIdentity, BrowserSession, User
+from english_for_developers.storage.models import AuthIdentity, BrowserSession, OnboardingRun, User
 
 NONCE_TTL = timedelta(minutes=10)
 
@@ -60,79 +61,131 @@ def telegram_sign_in(
     csrf_token: str | None,
     now: datetime,
     ttl_days: int,
-) -> tuple[AccountContext, str]:
-    """Sign in an existing account and leave the guest run unclaimed."""
+) -> tuple[AccountContext, str, bool]:
+    """Sign in an existing account or register one by claiming a completed guest run."""
     guest_hash, auth_hash = (
         hash_session_token(token) if token and token.isascii() else None
         for token in (guest_token, auth_token)
     )
-    with db.begin():
-        sessions = db.scalars(
-            select(BrowserSession)
-            .where(BrowserSession.token_hash.in_([guest_hash, auth_hash]))
-            .order_by(BrowserSession.id)
-            .with_for_update()
-            .execution_options(populate_existing=True)
-        ).all()
-        now = datetime.now(UTC)
-        guest = next((s for s in sessions if s.token_hash == guest_hash), None)
-        _require_login_guest(guest, csrf_token, now)
-        assert guest is not None
-        if (
-            guest.telegram_nonce_hash is None
-            or guest.telegram_nonce_expires_at is None
-            or guest.telegram_nonce_expires_at <= now
-            or not claims.nonce.isascii()
-            or not secrets.compare_digest(
-                guest.telegram_nonce_hash, hash_session_token(claims.nonce)
-            )
-        ):
-            raise ApiError(401, "invalid_telegram_token", "Telegram token is invalid")
-        guest.telegram_nonce_hash = None
-        guest.telegram_nonce_expires_at = None
-
-        identity = db.scalar(
-            select(AuthIdentity)
-            .where(AuthIdentity.provider == "telegram", AuthIdentity.subject == claims.subject)
-            .with_for_update()
-            .execution_options(populate_existing=True)
-        )
-        if identity is None:
-            raise ApiError(409, "registration_conflict", "A completed result is required")
-        user = db.scalar(
-            select(User)
-            .where(User.id == identity.user_id)
-            .with_for_update()
-            .execution_options(populate_existing=True)
-        )
-        now = datetime.now(UTC)
-        _require_login_guest(guest, csrf_token, now)
-        assert user is not None  # The locked identity has a foreign key to its user.
-
-        for previous in sessions:
+    try:
+        with db.begin():
+            sessions = db.scalars(
+                select(BrowserSession)
+                .where(BrowserSession.token_hash.in_([guest_hash, auth_hash]))
+                .order_by(BrowserSession.id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            ).all()
+            now = datetime.now(UTC)
+            guest = next((s for s in sessions if s.token_hash == guest_hash), None)
+            _require_login_guest(guest, csrf_token, now)
+            assert guest is not None
             if (
-                previous.token_hash == auth_hash
-                and previous.kind == "authenticated"
-                and previous.revoked_at is None
-                and previous.expires_at > now
+                guest.telegram_nonce_hash is None
+                or guest.telegram_nonce_expires_at is None
+                or guest.telegram_nonce_expires_at <= now
+                or not claims.nonce.isascii()
+                or not secrets.compare_digest(
+                    guest.telegram_nonce_hash, hash_session_token(claims.nonce)
+                )
             ):
-                previous.revoked_at = now
-        token = issue_session_token()
-        auth = BrowserSession(
-            id=uuid4(),
-            kind="authenticated",
-            user_id=user.id,
-            token_hash=hash_session_token(token),
-            csrf_secret=issue_csrf_secret(),
-            created_at=now,
-            expires_at=now + timedelta(days=ttl_days),
-        )
-        db.add(auth)
-        context = AccountContext(
-            user_id=user.id,
-            username=user.username,
-            csrf_token=auth.csrf_secret,
-            current_run_id=user.current_run_id,
-            expires_at=auth.expires_at,
-        )
-    return context, token
+                raise ApiError(401, "invalid_telegram_token", "Telegram token is invalid")
+            guest.telegram_nonce_hash = None
+            guest.telegram_nonce_expires_at = None
+
+            identity = db.scalar(
+                select(AuthIdentity)
+                .where(AuthIdentity.provider == "telegram", AuthIdentity.subject == claims.subject)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+            run = None
+            user: User | None
+            if identity is None:
+                if any(
+                    s.token_hash == auth_hash
+                    and s.kind == "authenticated"
+                    and s.revoked_at is None
+                    and s.expires_at > now
+                    for s in sessions
+                ):
+                    raise ApiError(409, "already_authenticated", "Already authenticated")
+                if run_id is None:
+                    raise ApiError(409, "registration_conflict", "A completed result is required")
+                run = db.scalar(
+                    select(OnboardingRun)
+                    .where(OnboardingRun.id == run_id)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
+                now = datetime.now(UTC)
+                _require_login_guest(guest, csrf_token, now)
+                if run is None or run.anonymous_session_id != guest.id or run.user_id is not None:
+                    raise ApiError(404, "onboarding_not_found", "Onboarding resource was not found")
+                if run.expires_at <= now:
+                    raise ApiError(410, "run_expired", "Onboarding run has expired")
+                if run.status != "completed":
+                    raise ApiError(409, "registration_conflict", "A completed result is required")
+                user = User(id=uuid4(), username=None, password_hash=None, created_at=now)
+                db.add(user)
+                db.flush()
+                db.add(
+                    AuthIdentity(
+                        id=uuid4(),
+                        user_id=user.id,
+                        provider="telegram",
+                        subject=claims.subject,
+                        created_at=now,
+                    )
+                )
+            else:
+                user = db.scalar(
+                    select(User)
+                    .where(User.id == identity.user_id)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
+                now = datetime.now(UTC)
+                _require_login_guest(guest, csrf_token, now)
+                assert user is not None  # The locked identity has a foreign key to its user.
+
+                for previous in sessions:
+                    if (
+                        previous.token_hash == auth_hash
+                        and previous.kind == "authenticated"
+                        and previous.revoked_at is None
+                        and previous.expires_at > now
+                    ):
+                        previous.revoked_at = now
+
+            token = issue_session_token()
+            auth = BrowserSession(
+                id=uuid4(),
+                kind="authenticated",
+                user_id=user.id,
+                token_hash=hash_session_token(token),
+                csrf_secret=issue_csrf_secret(),
+                created_at=now,
+                expires_at=now + timedelta(days=ttl_days),
+            )
+            db.add(auth)
+            if run is not None:
+                run.user_id, run.claimed_at = user.id, now
+                run.revision += 1
+                user.current_run_id = run.id
+                guest.revoked_at = now
+            context = AccountContext(
+                user_id=user.id,
+                username=user.username,
+                csrf_token=auth.csrf_secret,
+                current_run_id=user.current_run_id,
+                expires_at=auth.expires_at,
+            )
+        return context, token, identity is None
+    except IntegrityError as exc:
+        constraint_name = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+        if constraint_name == "uq_auth_identities_provider_subject":
+            raise ApiError(
+                409, "identity_conflict", "Telegram identity is already registered"
+            ) from exc
+        raise
