@@ -28,6 +28,8 @@ export default defineConfig({
         'case "$TEST_DATABASE_URL" in *_test) ;; ' +
         '*) echo "Refusing to run E2E: TEST_DATABASE_URL must end with _test" >&2; exit 1;; esac; ' +
         'export DATABASE_URL="$TEST_DATABASE_URL"; ' +
+        // E2E replaces Telegram itself; a real client id from .env must not leak in.
+        "unset TELEGRAM_CLIENT_ID; " +
         'export EXPECTED_ORIGIN="http://127.0.0.1:5173"; ' +
         "exec uv run --locked uvicorn english_for_developers.app:create_app --factory " +
         "--host 127.0.0.1 --port 8000",

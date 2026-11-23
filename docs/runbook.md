@@ -20,9 +20,10 @@
 - `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` — база и учётная запись PostgreSQL.
 - `EXPECTED_ORIGIN` — origin браузера; должен совпадать с ним. Локально при `HTTP_PORT=18080` это `http://localhost:18080`; позже, при появлении TLS, — например `https://example.invalid`.
 
-Необязательная переменная:
+Необязательные переменные:
 
 - `HTTP_PORT` — порт публикации прокси, по умолчанию `8080`; публикуется только `127.0.0.1`.
+- `TELEGRAM_CLIENT_ID` — Client ID бота для входа через Telegram (не секрет). Пустое значение отключает вход через Telegram: его маршруты отвечают `404 telegram_disabled`, кнопка не показывается. Настройка бота — в разделе «Вход через Telegram».
 
 Пароль попадает в `DATABASE_URL`, поэтому используйте только URL-safe символы (hex). Пропущенная обязательная переменная валит compose с сообщением вида `required variable POSTGRES_DB is missing a value`.
 
@@ -31,6 +32,23 @@
 ```bash
 docker compose --env-file .env.production -f deploy/compose.production.yaml config -q
 ```
+
+## Вход через Telegram
+
+Используется Telegram OpenID Connect во всплывающем окне (design §9.1). Настройка бота в @BotFather → бот → **Login Widget** → **Switch to OpenID Connect Login**:
+
+- **Redirect URIs**: `https://<DOMAIN>/` — со слешем: библиотека передаёт адрес страницы (origin + путь), а сайт открывается по `/`. Для локальной разработки — `http://127.0.0.1:5173/`.
+- **Trusted Origins**: `https://<DOMAIN>` и при необходимости `http://127.0.0.1:5173`.
+- **Signing Algorithm**: `RS256` — другие алгоритмы backend отклоняет.
+- **Client ID** → `TELEGRAM_CLIENT_ID` в `.env.production` (локально — в `.env`). **Client Secret** не нужен и в проект не записывается.
+
+Backend скачивает публичные ключи `https://oauth.telegram.org/.well-known/jwks.json` (кеш в процессе, таймаут 5 с), поэтому серверу нужен исходящий HTTPS к `oauth.telegram.org`. Проверка с хоста:
+
+```bash
+curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" --max-time 15 https://oauth.telegram.org/.well-known/jwks.json
+```
+
+Ожидается `200`. Без доступа вход через Telegram отвечает `503 telegram_unavailable`, вход по паролю работает. CSP в `deploy/nginx.conf` разрешает `https://oauth.telegram.org` в `script-src` и `connect-src`; заголовок `Cross-Origin-Opener-Policy: same-origin` добавлять нельзя — он рвёт связь со всплывающим окном. Лимиты: `/api/v1/auth/telegram` — общий с логином `auth_zone`, `/api/v1/auth/telegram/nonce` — `start_zone`.
 
 ## Порядок релиза
 
@@ -311,6 +329,7 @@ POSTGRES_USER=english_dev
 POSTGRES_PASSWORD=$(openssl rand -hex 32)
 DOMAIN=demo.example.com
 EXPECTED_ORIGIN=https://demo.example.com
+TELEGRAM_CLIENT_ID=
 EOF
 ```
 

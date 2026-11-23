@@ -45,6 +45,8 @@ services:
       DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
       EXPECTED_ORIGIN: ${EXPECTED_ORIGIN:?EXPECTED_ORIGIN is required}
       APP_ENV: production
+      # Optional: empty disables Telegram login (its routes answer 404).
+      TELEGRAM_CLIENT_ID: ${TELEGRAM_CLIENT_ID:-}
       # The backend is only reachable from the compose network, where nginx is
       # its only client and nginx overwrites X-Forwarded-For with the TCP peer
       # address, so every peer on that network may set proxy headers.
