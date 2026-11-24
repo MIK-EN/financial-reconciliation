@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { loadDraft, saveDraft } from "../draft";
 import type { ActiveRun } from "../types";
@@ -9,6 +9,8 @@ interface TextStepProps {
   run: ActiveRun;
   busy: boolean;
   error: string | null;
+  onHome: () => void;
+  headerAction?: ReactNode;
   onSubmit: (wordIds: string[]) => Promise<void>;
 }
 
@@ -22,7 +24,7 @@ function pluralWords(count: number): string {
 
 const MAX_TEXTS = 4;
 
-export function TextStep({ run, busy, error, onSubmit }: TextStepProps) {
+export function TextStep({ run, busy, error, onHome, headerAction, onSubmit }: TextStepProps) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set(loadDraft(run)));
 
   function update(next: Set<string>) {
@@ -42,7 +44,7 @@ export function TextStep({ run, busy, error, onSubmit }: TextStepProps) {
   const count = selectedIds.length;
 
   return (
-    <FlowShell busy={busy}>
+    <FlowShell busy={busy} onHome={onHome} headerAction={headerAction}>
       <div className="stack-12">
         <div className="step-meta">
           <p className="caption-3 muted">Текст {run.step.ordinal}</p>

@@ -30,7 +30,7 @@ async function logout(page: Page) {
 }
 
 async function login(page: Page, username: string) {
-  await page.getByRole("button", { name: "Войти" }).click();
+  await page.getByRole("button", { name: "Войти" }).first().click();
   await page.getByLabel("Логин").fill(username);
   await page.getByLabel("Пароль").fill("correct horse 123");
   await page.getByRole("button", { name: "Войти", exact: true }).click();

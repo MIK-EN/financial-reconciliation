@@ -35,6 +35,8 @@ interface ResultScreenProps {
   account: AccountContext | null;
   accountOfferDismissed: boolean;
   accountForm: ReactNode;
+  onHome: () => void;
+  headerAction?: ReactNode;
   onSelectLevel: (level: Level) => void;
   onRegister: () => void;
   onLogin: () => void;
@@ -50,6 +52,8 @@ export function ResultScreen({
   account,
   accountOfferDismissed,
   accountForm,
+  onHome,
+  headerAction,
   onSelectLevel,
   onRegister,
   onLogin,
@@ -58,7 +62,7 @@ export function ResultScreen({
   onDismissAccountOffer,
 }: ResultScreenProps) {
   return (
-    <FlowShell busy={busy}>
+    <FlowShell busy={busy} onHome={onHome} headerAction={headerAction}>
       <div className="stack-16">
         <p className="caption-3 muted">Результат</p>
         <h1 className="heading-3 hero-title" style={{ maxWidth: 680 }}>

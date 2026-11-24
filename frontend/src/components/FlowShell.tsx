@@ -1,22 +1,31 @@
 import type { ReactNode } from "react";
 
 interface FlowShellProps {
+  onHome?: () => void;
   headerAction?: ReactNode;
   children: ReactNode;
   busy?: boolean;
 }
 
 /** Page frame for the onboarding flow: brand header and a centred reading column. */
-export function FlowShell({ headerAction, children, busy = false }: FlowShellProps) {
+export function FlowShell({ onHome, headerAction, children, busy = false }: FlowShellProps) {
   return (
     <div className="flow">
       <header className="flow-header">
-        <span className="brand title-4">
+        <a
+          className="brand title-4"
+          href="/"
+          onClick={(event) => {
+            if (onHome === undefined) return;
+            event.preventDefault();
+            onHome();
+          }}
+        >
           <span className="brand-mark" aria-hidden="true">
             En
           </span>
           English for Developers
-        </span>
+        </a>
         {headerAction}
       </header>
       <main className="flow-main" aria-busy={busy}>

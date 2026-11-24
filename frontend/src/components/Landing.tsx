@@ -17,6 +17,7 @@ type CtaOrigin = "nav" | "hero" | "final";
 interface LandingProps {
   busy: boolean;
   error: string | null;
+  signedIn: boolean;
   onStart: () => void;
   onLogin: () => void;
 }
@@ -230,7 +231,7 @@ function Demo() {
   );
 }
 
-export function Landing({ busy, error, onStart, onLogin }: LandingProps) {
+export function Landing({ busy, error, signedIn, onStart, onLogin }: LandingProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const taglineRef = useRef<HTMLParagraphElement>(null);
   const [origin, setOrigin] = useState<CtaOrigin>("hero");
@@ -275,18 +276,20 @@ export function Landing({ busy, error, onStart, onLogin }: LandingProps) {
               Вопросы
             </a>
           </div>
-          <button
-            className="btn btn-ghost btn-sm button-sm btn-telegram nav-login"
-            aria-label="Войти через Telegram"
-            type="button"
-            disabled={busy}
-            onClick={onLogin}
-          >
-            <PaperPlaneTilt />
-            <span>
-              Войти<span className="nav-login-suffix"> через Telegram</span>
-            </span>
-          </button>
+          {signedIn ? null : (
+            <button
+              className="btn btn-ghost btn-sm button-sm btn-telegram nav-login"
+              aria-label="Войти через Telegram"
+              type="button"
+              disabled={busy}
+              onClick={onLogin}
+            >
+              <PaperPlaneTilt />
+              <span>
+                Войти<span className="nav-login-suffix"> через Telegram</span>
+              </span>
+            </button>
+          )}
           <button
             className="nav-cta btn btn-primary btn-sm button-sm"
             type="button"

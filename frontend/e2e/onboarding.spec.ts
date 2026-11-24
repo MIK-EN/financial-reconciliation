@@ -190,7 +190,7 @@ test("login keeps a guest result separate until explicit claim", async ({ page }
   await logout(page);
 
   await completeSimplifiedRoute(page);
-  await page.getByRole("button", { name: "Войти" }).click();
+  await page.getByRole("main").getByRole("button", { name: "Войти", exact: true }).click();
   await page.getByLabel("Логин").fill(username);
   await page.getByLabel("Пароль").fill("correct horse 123");
   await page.getByRole("button", { name: "Войти", exact: true }).click();
