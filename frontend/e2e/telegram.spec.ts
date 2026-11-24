@@ -112,3 +112,63 @@ test("closing the Telegram popup leaves the form without an error", async ({ pag
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(page.getByLabel("Логин")).toBeVisible();
 });
+
+test("desktop landing navigation shows the Telegram sign-in label and icon", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+
+  const nav = page.getByRole("navigation", { name: "Основная навигация" });
+  const signIn = nav.getByRole("button", { name: "Войти через Telegram" });
+  await expect(signIn).toHaveCount(1);
+  await expect(signIn).toBeVisible();
+  expect((await signIn.innerText()).trim().replace(/\s+/g, " ")).toBe("Войти через Telegram");
+  await expect(signIn.locator("svg")).toBeAttached();
+
+  const buttonBox = await signIn.boundingBox();
+  const questionsBox = await nav.getByRole("link", { name: "Вопросы" }).boundingBox();
+  expect(buttonBox).not.toBeNull();
+  expect(questionsBox).not.toBeNull();
+  expect(buttonBox!.x).toBeGreaterThan(questionsBox!.x);
+});
+
+test("phone landing navigation shows a compact Telegram sign-in button", async ({ page }) => {
+  const width = 375;
+  await page.setViewportSize({ width, height: 812 });
+  await page.goto("/");
+
+  const nav = page.getByRole("navigation", { name: "Основная навигация" });
+  const signIn = nav.getByRole("button", { name: "Войти через Telegram" });
+  await expect(signIn).toBeVisible();
+  const buttonBox = await signIn.boundingBox();
+  expect(buttonBox).not.toBeNull();
+  expect(buttonBox!.x).toBeGreaterThanOrEqual(0);
+  expect(buttonBox!.x + buttonBox!.width).toBeLessThanOrEqual(width);
+  expect((await signIn.innerText()).trim()).toBe("Войти");
+  await expect(signIn.locator("svg")).toBeAttached();
+});
+
+test("landing Telegram sign-in opens the login form with Telegram enabled", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await enableTelegram(page);
+  await page.goto("/");
+
+  const nav = page.getByRole("navigation", { name: "Основная навигация" });
+  await nav.getByRole("button", { name: "Войти через Telegram" }).click();
+
+  await expect(page.getByRole("heading", { name: "Войти", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Войти через Telegram" })).toBeEnabled();
+});
+
+test("landing Telegram sign-in opens the password form when Telegram is not configured", async ({ page }) => {
+  await page.goto("/");
+
+  const nav = page.getByRole("navigation", { name: "Основная навигация" });
+  const [nonceResponse] = await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith("/auth/telegram/nonce")),
+    nav.getByRole("button", { name: "Войти через Telegram" }).click(),
+  ]);
+
+  expect(nonceResponse.status()).toBe(404);
+  await expect(page.getByLabel("Логин")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Войти через Telegram" })).toHaveCount(0);
+});

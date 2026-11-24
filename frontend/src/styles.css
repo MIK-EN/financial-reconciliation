@@ -805,6 +805,7 @@ a {
   .levels { grid-template-columns: minmax(0, 1fr); }
   .nav-links,
   .nav-cta { display: none; }
+  .nav-login-suffix { display: none; }
   .final-cta { padding: 48px 24px; }
   .step-footer .actions,
   .step-footer .actions .btn,
