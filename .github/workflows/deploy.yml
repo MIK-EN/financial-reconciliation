@@ -1,0 +1,80 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+          (github.event.workflow_run.conclusion == 'success' &&
+           github.event.workflow_run.event == 'push' &&
+           github.event.workflow_run.head_branch == 'main') }}
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Deploy over SSH
+        id: ssh
+        shell: bash
+        env:
+          SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error::Invalid deployment SHA (expected 40 lowercase hex characters)'
+            exit 1
+          fi
+          printf 'sha=%s\n' "$SHA" >> "$GITHUB_OUTPUT"
+
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing required production secret: $name"
+              exit 1
+            fi
+          done
+
+          PORT="${DEPLOY_PORT:-22}"
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+          status=0
+          ssh -i ~/.ssh/deploy_key -p "$PORT" -o StrictHostKeyChecking=yes \
+            -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 \
+            -o ServerAliveInterval=30 "$DEPLOY_USER@$DEPLOY_HOST" "deploy $SHA" || status=$?
+
+          case "$status" in
+            0) echo "::notice::deployed $SHA" ;;
+            1) echo '::error::deploy failed, code rolled back to previous commit; DB schema not reverted — see runbook' ;;
+            3) echo '::error::another deploy is running' ;;
+            4) echo '::error::deploy AND rollback failed — manual action required on the server' ;;
+            *) echo "::error::deploy failed (SSH exit code $status)" ;;
+          esac
+          exit "$status"
+
+      - name: Remove deploy key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+      - name: Write deployment summary
+        if: always()
+        env:
+          SHA: ${{ steps.ssh.outputs.sha || 'unavailable' }}
+          RESULT: ${{ job.status }}
+        run: printf 'Commit `%s`\n\nResult **%s**\n' "$SHA" "$RESULT" >> "$GITHUB_STEP_SUMMARY"
