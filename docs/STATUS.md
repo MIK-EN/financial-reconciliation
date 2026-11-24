@@ -615,3 +615,12 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 - nginx: CSP разрешает `https://oauth.telegram.org` в `script-src` и `connect-src`; лимиты `/api/v1/auth/telegram` (`auth_zone`) и `/nonce` (`start_zone`); `nginx -t` успешен. `TELEGRAM_CLIENT_ID` прокинут в backend в `deploy/compose.production.yaml`; runbook (раздел «Вход через Telegram»), README и `.env.example` обновлены.
 - Проверено: `npm run typecheck`, Playwright `telegram.spec.ts` + `accounts.spec.ts` — 8 passed. Две мутации (scope `profile`, нет нового nonce после ошибки) ловятся. Скриншоты формы на 1280 и 375 px просмотрены.
 - Не сделано: выкладка на VPS с `TELEGRAM_CLIENT_ID`, проверка `curl` к `oauth.telegram.org` с VPS, ручной вход с настоящим Telegram.
+
+## Задача 11: кнопка Telegram в шапке лендинга, 2026-11-24
+
+- Решение пользователя: кнопку «Войти» в шапке лендинга заменить на «Войти через Telegram» с иконкой Telegram; на ширине до 720 px видно «Войти» с иконкой, доступное имя всегда «Войти через Telegram». Клик открывает существующую форму входа (Telegram сверху, логин/пароль ниже). Мгновенное окно Telegram из шапки отклонено: потребовало бы nonce и гостевую сессию на каждый визит, а новый пользователь без подбора всё равно получил бы `registration_conflict`.
+- Ветка `feat/telegram-header-button` от `origin/main` (после PR #14), без push. Коммит 9055c63.
+- Делегирование: Codex `gpt-6.2-sol`, две фазы (четыре e2e-теста, затем код), без повторов. Оркестратор исправил двойной отступ между «Войти» и «через Telegram» (flex-gap плюс сохранённый пробел), обернув подпись в один `span`.
+- Проверено: новые тесты падали на старом коде (кнопка не найдена); `npm run build` и полный Playwright — 39 passed; мутации (не скрывать суффикс на телефоне, убрать иконку) ловятся; скриншоты шапки на 1280 и 375 px просмотрены.
+- Ограничение: если `TELEGRAM_CLIENT_ID` на сервере не задан, кнопка всё равно подписана «через Telegram», а форма показывает только логин и пароль. На production он задан.
+- Не сделано: выкладка на VPS, ручной вход с настоящим Telegram.

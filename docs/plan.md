@@ -163,7 +163,7 @@
 
 ## 11. Вход и регистрация через Telegram
 
-**Статус:** код готов в ветке `feat/telegram-login` (backend, frontend, nginx, документация); остаются настройка бота и `TELEGRAM_CLIENT_ID` на VPS, проверка доступа к `oauth.telegram.org` с сервера и ручной вход на сайте. Решения пользователя 2026-11-23: OIDC popup + проверка JWT на сервере, таблица `auth_identities`, первый вход ведёт себя как регистрация. Спецификация — design §9.1.
+**Статус:** код слит в `main` (PR #14); кнопка «Войти через Telegram» в шапке лендинга — ветка `feat/telegram-header-button`, без push. Остаются настройка бота и `TELEGRAM_CLIENT_ID` на VPS, проверка доступа к `oauth.telegram.org` с сервера и ручной вход на сайте. Решения пользователя 2026-11-23: OIDC popup + проверка JWT на сервере, таблица `auth_identities`, первый вход ведёт себя как регистрация. Спецификация — design §9.1.
 
 **Зависит от:** 5, 6. **Создать:** `accounts/telegram.py`, миграцию `0003`, тесты. **Обновить:** модели, настройки, `accounts/service.py`, `api/auth_routes.py`, схемы, frontend (кнопка и форма результата), nginx (лимит и CSP), runbook и README. **Зависимость:** PyJWT с `crypto`.
 
@@ -173,6 +173,7 @@
 - [x] `POST /auth/telegram/nonce`: выдача и замена nonce, Origin/CSRF, выключенный Telegram.
 - [x] `POST /auth/telegram`: вход, регистрация с привязкой run, все отказы, повтор и гонка, отсутствие токена в логах; интеграционные тесты на PostgreSQL.
 - [x] Frontend: кнопка Telegram в форме аккаунта, контекст без логина, лимит nginx и CSP для библиотеки Telegram, e2e с подменённым ответом.
+- [x] Кнопка «Войти через Telegram» с иконкой в шапке лендинга (на телефоне — «Войти»), открывает форму входа; e2e на 1280 и 375 px.
 - [ ] Runbook (BotFather, `TELEGRAM_CLIENT_ID`), README, STATUS; проверка доступа к `oauth.telegram.org` с VPS и ручной вход на сайте.
 
 ## Общие команды и правило завершения
