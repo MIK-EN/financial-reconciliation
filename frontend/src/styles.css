@@ -157,6 +157,23 @@ a {
 
 .icon { flex-shrink: 0; }
 
+.btn-block { width: 100%; }
+.btn-telegram .icon { color: #229ed9; }
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
 /* Messages */
 .message {
   display: flex;

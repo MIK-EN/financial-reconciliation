@@ -599,3 +599,19 @@ CI для 1bbad06e386a2b802bfda0801f260fd5e49695e0 завершился success:
 - Ветка `feat/site-design` запушена; фактический CI run на `fa9c457` завершился успешно: https://github.com/MIK-EN/financial-reconciliation/actions/runs/44882821016.
 - Владелец перезагрузил VPS (`sudo reboot`): через две минуты все четыре контейнера `Up` и три `healthy` без ручных действий, cron активен и crontab сохранён, HTTPS отдаёт `HTTP/2 200`, данные и ревизия alembic на месте.
 - Остаются: срабатывание cron (лог после 03:15 UTC), проход в чистом браузере с телефона без VPN, страница подготовки к собеседованию.
+
+## Задача 11: вход через Telegram, серверная часть, 2026-11-23
+
+- Решения пользователя: Telegram OpenID Connect во всплывающем окне с проверкой `id_token` на сервере, таблица `auth_identities`, первый вход работает как регистрация. Записаны в `decisions.md`, спецификация — design §9.1, план — задача 11.
+- Ветка `feat/telegram-login` от `origin/main`, без push. Коммиты: документы, PyJWT[crypto], проверка `id_token` (`accounts/telegram.py`), миграция `0003_telegram_identities`, `POST /auth/telegram/nonce`, вход известного пользователя и регистрация с привязкой прохождения (`POST /auth/telegram`, 200/201).
+- Делегирование: все порции — Codex `gpt-6.2-sol`, в две фазы (тесты, затем код), без отказов и повторов. Оркестратор добавил один unit-тест на кеш верификатора и отформатировал тесты одной порции.
+- Проверено: полный `pytest tests` — 546 passed на PostgreSQL 17 (тестовая БД), Ruff lint/format и mypy чисто, `alembic check` без расхождений, `downgrade 0002` → `upgrade head` проходит. Покрытие веток нового кода 100%, кроме повторного выброса неожиданной `IntegrityError` в `telegram_login.py`. Мутационные проверки (подпись/алгоритм/срок, CSRF, гашение и срок nonce, отзыв guest-сессии, чужой и просроченный run, `identity_conflict`) ловятся тестами.
+- Не сделано: frontend (кнопка и библиотека Telegram, `username = null` в UI), лимит nginx и CSP для `/api/v1/auth/telegram*`, runbook/README (BotFather, `TELEGRAM_CLIENT_ID`), проверка доступа к `oauth.telegram.org` с VPS, ручной вход с настоящим ботом. Точный URL скрипта библиотеки Telegram в документации не найден — нужно взять из настроек бота в BotFather.
+
+## Задача 11: вход через Telegram, frontend и выпуск, 2026-11-23
+
+- Бот настроен владельцем в @BotFather в режиме OpenID Connect, Client ID `9018483804` (не секрет; Client Secret в проект не попадает). Владелец добавил Trusted Origins `https://engfordevelopers.ru/` и `http://127.0.0.1/`. Нужны ещё Redirect URIs `https://engfordevelopers.ru/` и `http://127.0.0.1:5173/` и origin с портом `http://127.0.0.1:5173`: библиотека передаёт адрес страницы как `redirect_uri`.
+- По решению владельца frontend писал оркестратор сам, без исполнителей. В форме аккаунта (сохранение и вход) — кнопка «Сохранить/Войти через Telegram». Nonce и библиотека `https://oauth.telegram.org/js/telegram-login.js?6` готовятся при открытии формы, чтобы окно открывалось по клику без блокировки. Запрашивается только `openid` (`scope: []`). Если в контексте `username: null`, UI показывает «Вы вошли через Telegram».
+- nginx: CSP разрешает `https://oauth.telegram.org` в `script-src` и `connect-src`; лимиты `/api/v1/auth/telegram` (`auth_zone`) и `/nonce` (`start_zone`); `nginx -t` успешен. `TELEGRAM_CLIENT_ID` прокинут в backend в `deploy/compose.production.yaml`; runbook (раздел «Вход через Telegram»), README и `.env.example` обновлены.
+- Проверено: `npm run typecheck`, Playwright `telegram.spec.ts` + `accounts.spec.ts` — 8 passed. Две мутации (scope `profile`, нет нового nonce после ошибки) ловятся. Скриншоты формы на 1280 и 375 px просмотрены.
+- Не сделано: выкладка на VPS с `TELEGRAM_CLIENT_ID`, проверка `curl` к `oauth.telegram.org` с VPS, ручной вход с настоящим Telegram.

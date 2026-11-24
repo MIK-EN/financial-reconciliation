@@ -13,6 +13,18 @@ class EmptyBody(BaseModel):
     model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
 
 
+class TelegramNonceResponse(BaseModel):
+    nonce: str
+    client_id: str
+
+
+class TelegramSignInRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
+
+    id_token: str = Field(min_length=1, max_length=8192, repr=False)
+    run_id: UUID | None = None
+
+
 class BrowserSessionResponse(BaseModel):
     session_id: UUID
     session_type: str
@@ -22,7 +34,7 @@ class BrowserSessionResponse(BaseModel):
 
 class AccountContext(BaseModel):
     user_id: UUID
-    username: str
+    username: str | None
     csrf_token: str
     current_run_id: UUID | None
     expires_at: datetime

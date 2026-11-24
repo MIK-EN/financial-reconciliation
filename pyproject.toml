@@ -13,6 +13,7 @@ dependencies = [
     "sqlalchemy>=2.0,<3",
     "pwdlib[argon2]>=0.3.1,<0.4",
     "uvicorn>=0.54,<0.55",
+    "pyjwt[crypto]>=2.10,<3",
 ]
 
 [build-system]
