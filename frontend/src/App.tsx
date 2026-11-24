@@ -62,6 +62,8 @@ type TelegramState =
       csrfToken: string;
     };
 
+type Screen = "home" | "flow";
+
 function keepNewestRun(current: RunState | null, candidate: RunState): RunState {
   if (current?.id === candidate.id && current.revision > candidate.revision) {
     return current;
@@ -71,6 +73,7 @@ function keepNewestRun(current: RunState | null, candidate: RunState): RunState 
 
 export function App() {
   const [loading, setLoading] = useState(true);
+  const [screen, setScreen] = useState<Screen>("home");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accountError, setAccountError] = useState<string | null>(null);
@@ -81,6 +84,7 @@ export function App() {
   const [run, setRun] = useState<RunState | null>(null);
   const [telegram, setTelegram] = useState<TelegramState>({ status: "off" });
   const [telegramAttempt, setTelegramAttempt] = useState(0);
+  const hasRun = run !== null;
 
   // Prepare Telegram while the account form is open: the nonce and the library
   // must be ready before the click, otherwise the browser blocks the popup.
@@ -126,6 +130,7 @@ export function App() {
     let cancelled = false;
 
     async function restore() {
+      let restored: RunState | null = null;
       try {
         const context = await getContext();
         if (cancelled) return;
@@ -133,14 +138,24 @@ export function App() {
         setAccount(context.account);
         const runId = context.anonymous_run_id ?? context.account?.current_run_id ?? null;
         if (runId !== null) {
-          const restored = await getRun(runId);
-          if (!cancelled) setRun((current) => keepNewestRun(current, restored));
+          restored = await getRun(runId);
         }
       } catch (caught) {
         if (!cancelled) setError(errorMessage(caught));
-      } finally {
-        if (!cancelled) setLoading(false);
       }
+      if (cancelled) return;
+
+      const isHomeEntry = window.history.state?.screen === "home";
+      if (restored !== null) {
+        setRun(restored);
+        if (!isHomeEntry) {
+          window.history.replaceState({ screen: "flow" }, "", "/onboarding");
+          setScreen("flow");
+        }
+      } else if (!isHomeEntry || window.location.pathname !== "/") {
+        window.history.replaceState({ screen: "home" }, "", "/");
+      }
+      setLoading(false);
     }
 
     void restore();
@@ -149,9 +164,40 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    function handlePopState(event: PopStateEvent) {
+      setScreen(event.state?.screen === "flow" && hasRun ? "flow" : "home");
+      setAccountMode(null);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [hasRun]);
+
+  function openFlow() {
+    window.history.pushState({ screen: "flow" }, "", "/onboarding");
+    setScreen("flow");
+  }
+
+  function handleHome() {
+    window.history.pushState({ screen: "home" }, "", "/");
+    setScreen("home");
+    setAccountMode(null);
+  }
+
+  function openLogin() {
+    setAccountError(null);
+    setAccountMode("login");
+  }
+
   async function handleStart() {
-    setBusy(true);
     setError(null);
+    if (run !== null) {
+      openFlow();
+      return;
+    }
+
+    setBusy(true);
     try {
       let token = guestCsrfToken;
       if (token === null) {
@@ -161,6 +207,7 @@ export function App() {
       }
       const started = await startRun(token);
       setRun((current) => keepNewestRun(current, started));
+      openFlow();
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
@@ -271,6 +318,7 @@ export function App() {
       if (run === null && loggedIn.current_run_id !== null) {
         const restored = await getRun(loggedIn.current_run_id);
         setRun((current) => keepNewestRun(current, restored));
+        openFlow();
       }
     } catch (caught) {
       setAccountError(errorMessage(caught));
@@ -316,6 +364,7 @@ export function App() {
       } else if (run === null && signedIn.current_run_id !== null) {
         const restored = await getRun(signedIn.current_run_id);
         setRun((current) => keepNewestRun(current, restored));
+        openFlow();
       }
     } catch (caught) {
       setAccountError(telegramErrorMessage(caught));
@@ -340,7 +389,11 @@ export function App() {
       await logoutAccount(account.csrf_token);
       setAccount(null);
       setAccountMode(null);
-      if (run?.status === "completed" && run.saved_to_account) setRun(null);
+      if (run?.status === "completed" && run.saved_to_account) {
+        setRun(null);
+        window.history.replaceState({ screen: "home" }, "", "/");
+        setScreen("home");
+      }
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
@@ -368,33 +421,36 @@ export function App() {
   if (loading) {
     return <LoadingScreen />;
   }
-  if (run === null) {
-    if (accountMode === "login") {
-      return (
-        <FlowShell busy={busy}>
-          <AccountForm
-            mode="login"
-            busy={busy}
-            error={accountError}
-            onSubmit={handleLogin}
-            onCancel={() => setAccountMode(null)}
-            telegram={telegramOption}
-          />
-        </FlowShell>
-      );
-    }
+  if (accountMode === "login" && (screen === "home" || run === null || run.status === "active")) {
+    return (
+      <FlowShell busy={busy} onHome={handleHome}>
+        <AccountForm
+          mode="login"
+          busy={busy}
+          error={accountError}
+          onSubmit={handleLogin}
+          onCancel={() => setAccountMode(null)}
+          telegram={telegramOption}
+        />
+      </FlowShell>
+    );
+  }
+  if (screen === "home" || run === null) {
     return (
       <Landing
         busy={busy}
         error={error}
+        signedIn={account !== null}
         onStart={() => void handleStart()}
-        onLogin={() => {
-          setAccountError(null);
-          setAccountMode("login");
-        }}
+        onLogin={openLogin}
       />
     );
   }
+  const headerAction = account === null && accountMode === null ? (
+    <button className="btn btn-ghost btn-sm button-sm" type="button" onClick={openLogin}>
+      Войти
+    </button>
+  ) : null;
   if (run.status === "active") {
     return (
       <TextStep
@@ -402,6 +458,8 @@ export function App() {
         run={run}
         busy={busy}
         error={error}
+        onHome={handleHome}
+        headerAction={headerAction}
         onSubmit={handleAnswer}
       />
     );
@@ -412,6 +470,8 @@ export function App() {
       busy={busy}
       error={error}
       account={account}
+      onHome={handleHome}
+      headerAction={headerAction}
       accountOfferDismissed={accountOfferDismissed}
       accountForm={
         accountMode === null ? null : (
@@ -431,10 +491,7 @@ export function App() {
         setAccountError(null);
         setAccountMode("register");
       }}
-      onLogin={() => {
-        setAccountError(null);
-        setAccountMode("login");
-      }}
+      onLogin={openLogin}
       onLogout={() => void handleLogout()}
       onClaim={() => void handleClaim()}
       onDismissAccountOffer={() => {
