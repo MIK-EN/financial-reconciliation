@@ -6,6 +6,7 @@ import {
   Clock,
   Folder,
   LockOpen,
+  PaperPlaneTilt,
   Plus,
   Sliders,
   WarningCircle,
@@ -275,12 +276,16 @@ export function Landing({ busy, error, onStart, onLogin }: LandingProps) {
             </a>
           </div>
           <button
-            className="btn btn-ghost btn-sm button-sm"
+            className="btn btn-ghost btn-sm button-sm btn-telegram nav-login"
+            aria-label="Войти через Telegram"
             type="button"
             disabled={busy}
             onClick={onLogin}
           >
-            Войти
+            <PaperPlaneTilt />
+            <span>
+              Войти<span className="nav-login-suffix"> через Telegram</span>
+            </span>
           </button>
           <button
             className="nav-cta btn btn-primary btn-sm button-sm"
