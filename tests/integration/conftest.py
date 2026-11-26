@@ -26,7 +26,9 @@ def test_engine() -> Iterator[Engine]:
 @pytest.fixture(autouse=True)
 def clean_test_database(test_engine: Engine) -> Iterator[None]:
     with test_engine.begin() as connection:
-        connection.execute(text("TRUNCATE TABLE browser_sessions, content_bundles, users CASCADE"))
+        connection.execute(
+            text("TRUNCATE TABLE browser_sessions, content_bundles, trainer_bundles, users CASCADE")
+        )
     yield
 
 

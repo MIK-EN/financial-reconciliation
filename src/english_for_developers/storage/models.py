@@ -62,6 +62,28 @@ class ContentSettings(Base):
     threshold_percent: Mapped[int] = mapped_column(SmallInteger, nullable=False)
 
 
+class TrainerBundle(Base):
+    __tablename__ = "trainer_bundles"
+    __table_args__ = (
+        CheckConstraint("length(content_hash) = 64", name="content_hash_sha256_length"),
+    )
+
+    version: Mapped[str] = mapped_column(String(64), primary_key=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    content_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class TrainerSettings(Base):
+    __tablename__ = "trainer_settings"
+    __table_args__ = (CheckConstraint("id = 1", name="singleton_row"),)
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
+    active_version: Mapped[str] = mapped_column(
+        ForeignKey("trainer_bundles.version", ondelete="RESTRICT"), nullable=False
+    )
+
+
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (

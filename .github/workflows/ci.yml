@@ -68,8 +68,8 @@ jobs:
       - name: Integration tests
         run: uv run --locked pytest tests/integration -q
 
-      - name: Unit tests
-        run: uv run --locked pytest tests/unit -q
+      - name: Unit and API tests
+        run: uv run --locked pytest tests/unit tests/api -q
 
   e2e:
     name: Browser E2E (Chromium)
@@ -113,6 +113,7 @@ jobs:
         run: |
           uv run --locked alembic upgrade head
           uv run --locked python -m english_for_developers.cli content import content/onboarding-v1.json --activate --threshold-percent 20
+          uv run --locked python -m english_for_developers.cli trainer import content/trainer-v1.json --activate
 
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

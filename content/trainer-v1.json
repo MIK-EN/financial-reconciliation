@@ -1,0 +1,334 @@
+{
+  "schema_version": 1,
+  "version": "trainer-v1",
+  "topics": [
+    {
+      "id": "code-review",
+      "title": "Code review",
+      "description": "Просить об изменениях, уточнять решения и отвечать на замечания.",
+      "exercises": [
+        {
+          "id": "review-empty-list",
+          "title": "Попросить проверку",
+          "level": "A2",
+          "situation": "You are reviewing a function. It works with one item, but there is no test for an empty list.",
+          "prompt": "Which comment clearly asks for the missing test?",
+          "correct_option_id": "b",
+          "options": [
+            {
+              "id": "a",
+              "text": "This test is empty.",
+              "explanation": "Здесь сказано, что сам тест пустой. Это не просьба проверить пустой список."
+            },
+            {
+              "id": "b",
+              "text": "Could you add a test for an empty list?",
+              "explanation": "Could you + глагол — вежливая просьба. A test for an empty list точно называет недостающий случай."
+            },
+            {
+              "id": "c",
+              "text": "Could you remove the list from this test?",
+              "explanation": "Просьба вежливая, но предлагает удалить список, а не добавить проверку."
+            }
+          ]
+        },
+        {
+          "id": "review-explain-choice",
+          "title": "Уточнить решение",
+          "level": "B1",
+          "situation": "A colleague uses a cache in a small function. You do not understand why it is needed.",
+          "prompt": "You want to understand the reason before suggesting a change. What do you write?",
+          "correct_option_id": "c",
+          "options": [
+            {
+              "id": "a",
+              "text": "Please remove the cache before I review this.",
+              "explanation": "Вы уже требуете изменение, хотя ещё не знаете причины решения."
+            },
+            {
+              "id": "b",
+              "text": "The cache makes this function faster.",
+              "explanation": "Это утверждение о скорости, а не вопрос о причине. Из ситуации ускорение не следует."
+            },
+            {
+              "id": "c",
+              "text": "Could you explain why we need a cache here?",
+              "explanation": "Explain why помогает узнать причину. We делает вопрос совместным обсуждением решения."
+            }
+          ]
+        },
+        {
+          "id": "review-fixed",
+          "title": "Ответить на замечание",
+          "level": "A2",
+          "situation": "A reviewer asked you to rename a variable. You have renamed it and pushed the change.",
+          "prompt": "Which reply accurately tells the reviewer what you have done?",
+          "correct_option_id": "a",
+          "options": [
+            {
+              "id": "a",
+              "text": "Thanks! I have renamed the variable. Could you take another look?",
+              "explanation": "I have renamed сообщает о готовом изменении. Take another look — просьба посмотреть ещё раз."
+            },
+            {
+              "id": "b",
+              "text": "Thanks! I will rename the variable tomorrow.",
+              "explanation": "Will rename обещает будущее действие, но вы уже переименовали переменную."
+            },
+            {
+              "id": "c",
+              "text": "Thanks! Could you rename the variable for me?",
+              "explanation": "Так вы просите ревьюера сделать работу за вас, а не сообщаете о выполненном изменении."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "meetings",
+      "title": "Созвоны и дейлики",
+      "description": "Коротко говорить о работе, просить помощь и уточнять услышанное.",
+      "exercises": [
+        {
+          "id": "meeting-blocked",
+          "title": "Сообщить о блокере",
+          "level": "A2",
+          "situation": "You finished the API code yesterday. Today you want to test it, but you cannot access the test server.",
+          "prompt": "Which daily update explains both your plan and your blocker?",
+          "correct_option_id": "c",
+          "options": [
+            {
+              "id": "a",
+              "text": "I tested the API yesterday. Everything is ready.",
+              "explanation": "Вы сообщаете о завершённом тестировании. По условию оно ещё не началось."
+            },
+            {
+              "id": "b",
+              "text": "I am working on the API. That is all.",
+              "explanation": "Коллеги не узнают ни план тестирования, ни проблему с доступом."
+            },
+            {
+              "id": "c",
+              "text": "The API code is done. I plan to test it today, but I need access to the test server.",
+              "explanation": "Done отделяет выполненное от плана. But I need прямо называет блокер, с которым команда может помочь."
+            }
+          ]
+        },
+        {
+          "id": "meeting-repeat",
+          "title": "Попросить повторить",
+          "level": "A2",
+          "situation": "The audio cut out during a call. You did not hear the last part of your colleague's update.",
+          "prompt": "What is the clearest way to ask for the missing information?",
+          "correct_option_id": "a",
+          "options": [
+            {
+              "id": "a",
+              "text": "Sorry, I missed the last part. Could you say that again?",
+              "explanation": "I missed the last part уточняет, что именно не удалось услышать. Say that again — естественная просьба повторить."
+            },
+            {
+              "id": "b",
+              "text": "Sorry, I missed the meeting. Can we start tomorrow?",
+              "explanation": "Missed the meeting означает, что вы пропустили весь созвон, хотя вы на нём присутствуете."
+            },
+            {
+              "id": "c",
+              "text": "Sorry, I disagree with the last part.",
+              "explanation": "Disagree означает «не соглашаться». Это возражение, а не просьба повторить."
+            }
+          ]
+        },
+        {
+          "id": "meeting-deadline",
+          "title": "Уточнить срок",
+          "level": "B1",
+          "situation": "Your team lead says, \"Let's ship the fix on Friday.\" You are not sure whether it must be ready before the daily call.",
+          "prompt": "Which question checks the exact deadline?",
+          "correct_option_id": "b",
+          "options": [
+            {
+              "id": "a",
+              "text": "Why do we have a daily call on Friday?",
+              "explanation": "Вопрос о причине созвона не уточняет срок готовности исправления."
+            },
+            {
+              "id": "b",
+              "text": "Just to confirm, should the fix be ready before Friday's daily call?",
+              "explanation": "Just to confirm вводит уточнение. Before Friday’s daily call задаёт конкретную границу срока."
+            },
+            {
+              "id": "c",
+              "text": "The fix was ready before Friday's daily call.",
+              "explanation": "Это сообщение о прошлом. Оно не задаёт вопрос и не проверяет договорённость."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "messages",
+      "title": "Переписка в чате/PR",
+      "description": "Просить ревью, описывать баги и договариваться о времени.",
+      "exercises": [
+        {
+          "id": "message-review",
+          "title": "Попросить ревью",
+          "level": "A2",
+          "situation": "Your pull request is ready. You want a teammate to review it when they have time today.",
+          "prompt": "Which message makes the request clear and polite?",
+          "correct_option_id": "a",
+          "options": [
+            {
+              "id": "a",
+              "text": "My PR is ready for review. Could you take a look today when you have time?",
+              "explanation": "Ready for review сообщает о готовности. Could you take a look — вежливая просьба с понятным сроком."
+            },
+            {
+              "id": "b",
+              "text": "I am reviewing your PR today.",
+              "explanation": "Так вы сообщаете о ревью чужого PR. Вам нужно попросить коллегу проверить ваш."
+            },
+            {
+              "id": "c",
+              "text": "My PR will be ready next week. Please wait.",
+              "explanation": "Сообщение откладывает ревью до следующей недели, хотя PR уже готов."
+            }
+          ]
+        },
+        {
+          "id": "message-bug",
+          "title": "Описать проблему",
+          "level": "B1",
+          "situation": "On the profile page, clicking Save shows an error. Reloading the page does not help.",
+          "prompt": "Which message gives a teammate useful steps and the result?",
+          "correct_option_id": "b",
+          "options": [
+            {
+              "id": "a",
+              "text": "The profile page is bad. Please fix it.",
+              "explanation": "Оценка bad не помогает воспроизвести ошибку: нет действия и наблюдаемого результата."
+            },
+            {
+              "id": "b",
+              "text": "When I click Save on the profile page, I get an error. It still happens after a reload.",
+              "explanation": "When I click задаёт шаг, I get an error — результат. After a reload добавляет уже проверенное действие."
+            },
+            {
+              "id": "c",
+              "text": "I saved the profile successfully after a reload.",
+              "explanation": "Successfully означает «успешно». Это противоположно наблюдаемой проблеме."
+            }
+          ]
+        },
+        {
+          "id": "message-time",
+          "title": "Договориться о времени",
+          "level": "A2",
+          "situation": "A teammate asks for help now. You are in a call until 3 pm, and you can help after it.",
+          "prompt": "Which reply gives a useful alternative?",
+          "correct_option_id": "c",
+          "options": [
+            {
+              "id": "a",
+              "text": "I can help now. Please call me.",
+              "explanation": "Ответ обещает помощь немедленно, хотя сейчас вы заняты на созвоне."
+            },
+            {
+              "id": "b",
+              "text": "I was in a call yesterday.",
+              "explanation": "Сообщение о вчерашнем созвоне не объясняет, когда вы сможете помочь сегодня."
+            },
+            {
+              "id": "c",
+              "text": "I am in a call until 3 pm. Can we look at it together after that?",
+              "explanation": "Until 3 pm объясняет, до какого времени вы заняты. After that предлагает понятную альтернативу."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "interview",
+      "title": "Собеседование",
+      "description": "Рассказывать о своём опыте, уточнять задачу и рассуждать вслух.",
+      "exercises": [
+        {
+          "id": "interview-role",
+          "title": "Рассказать о вкладе",
+          "level": "A2",
+          "situation": "In your last project, you built a small API with Python. The interviewer asks what you did on the project.",
+          "prompt": "Which answer describes your own contribution?",
+          "correct_option_id": "b",
+          "options": [
+            {
+              "id": "a",
+              "text": "Python is a popular language for APIs.",
+              "explanation": "Общий факт о языке не отвечает на вопрос о вашей работе."
+            },
+            {
+              "id": "b",
+              "text": "I built the API in Python and wrote tests for its endpoints.",
+              "explanation": "I built и wrote описывают конкретные выполненные действия и вашу роль в проекте."
+            },
+            {
+              "id": "c",
+              "text": "I would like to build an API in Python one day.",
+              "explanation": "Would like говорит о желании на будущее, а вопрос был о прошлом проекте."
+            }
+          ]
+        },
+        {
+          "id": "interview-clarify",
+          "title": "Уточнить условие",
+          "level": "B1",
+          "situation": "The interviewer asks you to sort a list of users. They have not said which field to use.",
+          "prompt": "Which question helps you clarify the task before coding?",
+          "correct_option_id": "c",
+          "options": [
+            {
+              "id": "a",
+              "text": "Should I delete all the users first?",
+              "explanation": "Вопрос о удалении пользователей не уточняет сортировку и предлагает лишнее действие."
+            },
+            {
+              "id": "b",
+              "text": "Can I finish the interview now?",
+              "explanation": "Этот вопрос завершает разговор вместо уточнения задачи."
+            },
+            {
+              "id": "c",
+              "text": "Should I sort the users by name or by the date they joined?",
+              "explanation": "Sort by называет ключ сортировки. Два конкретных поля помогают согласовать условие до написания кода."
+            }
+          ]
+        },
+        {
+          "id": "interview-thinking",
+          "title": "Объяснить следующий шаг",
+          "level": "B1",
+          "situation": "During a coding interview, your first solution fails for an empty list. You want to explain what you will try next.",
+          "prompt": "Which answer shows a clear next step?",
+          "correct_option_id": "a",
+          "options": [
+            {
+              "id": "a",
+              "text": "This fails for an empty list. I will add a check for that case and run the test again.",
+              "explanation": "Вы называете сбой, предлагаете исправление и проверку. I will add ясно обозначает следующий шаг."
+            },
+            {
+              "id": "b",
+              "text": "The test must be wrong because my code is always correct.",
+              "explanation": "Ответ отвергает наблюдаемый сбой без проверки и не предлагает следующего шага."
+            },
+            {
+              "id": "c",
+              "text": "I fixed this yesterday and all the tests passed.",
+              "explanation": "Это рассказ о прошлом, а сейчас решение всё ещё падает. План исправления остаётся неясным."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

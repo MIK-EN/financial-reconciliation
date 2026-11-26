@@ -78,7 +78,7 @@ const FAQ = [
   },
   {
     q: "Когда появятся занятия?",
-    a: "Короткие занятия с проверкой ответов и повторением ошибок готовятся следующим этапом. Сейчас доступен подбор стартовой сложности.",
+    a: "В разделе «Тренажёр» уже доступны короткие задания по рабочим ситуациям: выберите ответ и прочитайте объяснение. Также можно пройти подбор стартовой сложности для чтения документации.",
   },
 ];
 
@@ -266,6 +266,7 @@ export function Landing({ busy, error, signedIn, onStart, onLogin }: LandingProp
             English for Developers
           </a>
           <div className="nav-links title-4">
+            <a className="nav-link" href="/trainer">Тренажёр</a>
             <a className="nav-link" href="#how">
               Как это работает
             </a>
@@ -332,6 +333,7 @@ export function Landing({ busy, error, signedIn, onStart, onLogin }: LandingProp
                   <ArrowRight />
                 </button>
                 {errorAlert("hero")}
+                <a className="title-3" href="/trainer">Открыть тренажёр →</a>
                 <ul className="proof caption-1 muted">
                   <li>
                     <Check size={16} />
