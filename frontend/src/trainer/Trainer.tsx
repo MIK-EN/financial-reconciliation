@@ -255,4 +255,3 @@ function Practice({ data }: { data: TrainerData }) {
     </>
   );
 }
-
