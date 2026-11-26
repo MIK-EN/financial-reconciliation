@@ -36,7 +36,7 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: backend
-    image: english-for-developers-backend:local
+    image: ${BACKEND_IMAGE:-english-for-developers-backend:local}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -66,7 +66,7 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: proxy
-    image: english-for-developers-proxy:local
+    image: ${PROXY_IMAGE:-english-for-developers-proxy:local}
     restart: unless-stopped
     depends_on:
       backend:
@@ -92,7 +92,7 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: backend
-    image: english-for-developers-backend:local
+    image: ${BACKEND_IMAGE:-english-for-developers-backend:local}
     command: ["alembic", "upgrade", "head"]
     restart: "no"
     depends_on:
@@ -107,7 +107,7 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: backend
-    image: english-for-developers-backend:local
+    image: ${BACKEND_IMAGE:-english-for-developers-backend:local}
     command:
       - /bin/sh
       - -ec
@@ -127,7 +127,7 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: backend
-    image: english-for-developers-backend:local
+    image: ${BACKEND_IMAGE:-english-for-developers-backend:local}
     command: ["python", "-m", "english_for_developers.cli", "sessions", "cleanup"]
     restart: "no"
     depends_on:

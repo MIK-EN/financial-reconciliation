@@ -14,7 +14,7 @@ UP = f"{COMPOSE} up -d --wait --wait-timeout 300"
 RESTART = f"{COMPOSE} restart caddy"
 DEPLOY_CALLS = [
     "backup",
-    f"{COMPOSE} build",
+    f"{COMPOSE} pull backend proxy",
     f"{COMPOSE} run --rm migrate",
     f"{COMPOSE} run --rm import-content",
     UP,
@@ -22,6 +22,7 @@ DEPLOY_CALLS = [
 HEALTH_URL = "https://x/"
 HEALTH_CALL = f"curl -fsS -o /dev/null --max-time 10 {HEALTH_URL}"
 SECRET = "s3cr3t-value"
+IMAGE_PREFIX = "ghcr.io/mik-en/efd"
 
 
 @dataclass
@@ -49,6 +50,10 @@ class Checkout:
 
     def calls(self) -> list[str]:
         return Path(self.env["CALL_LOG"]).read_text().splitlines()
+
+    def images(self) -> list[str]:
+        """BACKEND_IMAGE as seen by each docker call, in order."""
+        return Path(self.env["IMAGE_LOG"]).read_text().splitlines()
 
 
 def git(cwd: Path, env: dict[str, str], *args: str) -> str:
@@ -99,12 +104,14 @@ def checkout(workspace, caddy_changed):
         GIT_COMMITTER_EMAIL="deploy@example.test",
         LOCK_DIR=str(workspace),
         CALL_LOG=str(call_log),
+        IMAGE_LOG=str(workspace / "images.log"),
         FAIL_MARKER=str(workspace / "docker-failed"),
         DEPLOY_HEALTH_DELAY="0",
     )
     executable(
         bin_dir / "docker",
         """printf 'docker %s\n' "$*" >> "$CALL_LOG"
+printf '%s\n' "${BACKEND_IMAGE:-}" >> "$IMAGE_LOG"
 if [[ -n ${FAKE_DOCKER_FAIL:-} && "$*" == *"$FAKE_DOCKER_FAIL"* ]]; then
     if [[ ${FAKE_DOCKER_FAIL_ONCE:-} != 1 || ! -e "$FAIL_MARKER" ]]; then
         touch "$FAIL_MARKER"
@@ -194,6 +201,31 @@ def test_restarts_caddy_after_up_when_config_changed(checkout):
     assert_success(checkout, checkout.deploy(checkout.target), [*DEPLOY_CALLS, RESTART])
 
 
+def test_deploys_images_tagged_with_target_and_records_it(checkout):
+    assert_success(checkout, checkout.deploy(checkout.target), DEPLOY_CALLS)
+    assert checkout.images() == [f"{IMAGE_PREFIX}-backend:{checkout.target}"] * 4
+    assert (checkout.repo / ".deployed-sha").read_text().strip() == checkout.target
+
+
+def test_failed_deploy_does_not_record_target(checkout):
+    checkout.deploy(checkout.target, FAKE_DOCKER_FAIL="run --rm migrate")
+    assert not (checkout.repo / ".deployed-sha").exists()
+
+
+def test_rollback_restores_previously_deployed_images(checkout):
+    (checkout.repo / ".deployed-sha").write_text(f"{checkout.previous}\n")
+    result = checkout.deploy(checkout.target, FAKE_DOCKER_FAIL="run --rm migrate")
+    assert_rollback(checkout, result, [*DEPLOY_CALLS[:3], UP])
+    assert checkout.images()[-1] == f"{IMAGE_PREFIX}-backend:{checkout.previous}"
+    assert (checkout.repo / ".deployed-sha").read_text().strip() == checkout.previous
+
+
+def test_first_deploy_rollback_falls_back_to_local_images(checkout):
+    result = checkout.deploy(checkout.target, FAKE_DOCKER_FAIL="run --rm migrate")
+    assert_rollback(checkout, result, [*DEPLOY_CALLS[:3], UP])
+    assert checkout.images()[-1] == ""
+
+
 def test_leaves_current_commit_alone(checkout):
     result = checkout.deploy(checkout.previous)
     assert_untouched(checkout, result, code=0)
@@ -265,23 +297,23 @@ def test_backup_failure_prevents_checkout(checkout):
 
 def test_migration_failure_rolls_back_code(checkout):
     result = checkout.deploy(checkout.target, FAKE_DOCKER_FAIL="run --rm migrate")
-    assert_rollback(checkout, result, [*DEPLOY_CALLS[:3], f"{COMPOSE} build", UP])
+    assert_rollback(checkout, result, [*DEPLOY_CALLS[:3], UP])
 
 
-def test_build_failure_rolls_back_code(checkout):
-    result = checkout.deploy(checkout.target, FAKE_DOCKER_FAIL="build", FAKE_DOCKER_FAIL_ONCE="1")
-    assert_rollback(checkout, result, [*DEPLOY_CALLS[:2], f"{COMPOSE} build", UP])
+def test_pull_failure_rolls_back_code(checkout):
+    result = checkout.deploy(checkout.target, FAKE_DOCKER_FAIL="pull", FAKE_DOCKER_FAIL_ONCE="1")
+    assert_rollback(checkout, result, [*DEPLOY_CALLS[:2], UP])
 
 
 @pytest.mark.parametrize("caddy_changed", [True])
 def test_up_failure_restarts_caddy_during_rollback(checkout):
     result = checkout.deploy(checkout.target, FAKE_DOCKER_FAIL="up -d", FAKE_DOCKER_FAIL_ONCE="1")
-    assert_rollback(checkout, result, [*DEPLOY_CALLS, f"{COMPOSE} build", UP, RESTART])
+    assert_rollback(checkout, result, [*DEPLOY_CALLS, UP, RESTART])
 
 
 def test_health_failure_retries_five_times_then_rolls_back(checkout):
     result = checkout.deploy(checkout.target, DEPLOY_HEALTH_URL=HEALTH_URL, FAKE_CURL_FAIL="1")
-    assert_rollback(checkout, result, [*DEPLOY_CALLS, *([HEALTH_CALL] * 5), f"{COMPOSE} build", UP])
+    assert_rollback(checkout, result, [*DEPLOY_CALLS, *([HEALTH_CALL] * 5), UP])
 
 
 def test_successful_health_check_runs_once(checkout):
@@ -290,9 +322,9 @@ def test_successful_health_check_runs_once(checkout):
 
 
 def test_rollback_failure_requires_manual_action(checkout):
-    result = checkout.deploy(checkout.target, FAKE_DOCKER_FAIL="build")
+    result = checkout.deploy(checkout.target, FAKE_DOCKER_FAIL="up -d")
     assert_exit(result, 4)
-    assert checkout.calls() == [*DEPLOY_CALLS[:2], f"{COMPOSE} build"]
+    assert checkout.calls() == [*DEPLOY_CALLS, UP]
     assert "manual action required" in result.stderr.lower()
 
 

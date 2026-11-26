@@ -34,3 +34,6 @@ frontend/test-results/
 /HUMAN.MD
 
 .tools/
+
+# Written by scripts/vps-deploy.sh on the server
+.deployed-sha

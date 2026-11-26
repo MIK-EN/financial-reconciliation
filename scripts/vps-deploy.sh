@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 #
 # Deploy one commit on the production VPS, with a backup before checkout.
-# Rollback restores the previous code and images. Database restore is manual.
+# Images are built by CI and pulled from the registry (Docker Hub CDN is not
+# reachable from the VPS, so the server never builds). Rollback restores the
+# previous code and the previously deployed images. Database restore is manual.
 #
 set -euo pipefail
 umask 077
@@ -39,6 +41,16 @@ check_health() {
   return 1
 }
 
+# Images of the last successful deploy; empty means the locally built images.
+use_images() {
+  local tag=$1
+  if [ -n "$tag" ]; then
+    export BACKEND_IMAGE="$IMAGE_PREFIX-backend:$tag" PROXY_IMAGE="$IMAGE_PREFIX-proxy:$tag"
+  else
+    unset BACKEND_IMAGE PROXY_IMAGE
+  fi
+}
+
 rollback_step() {
   local step=$1
   shift
@@ -49,7 +61,7 @@ rollback_step() {
 rollback() {
   printf 'vps-deploy.sh: deploy failed at %s\n' "$1" >&2
   rollback_step checkout git reset --keep "$PREV"
-  rollback_step build dc build
+  use_images "$PREV_IMAGE_TAG"
   rollback_step up dc up -d --wait --wait-timeout "$DEPLOY_WAIT_TIMEOUT"
   if [ "$CADDY_CHANGED" = yes ]; then
     rollback_step "restart caddy" dc restart caddy
@@ -108,6 +120,13 @@ fi
 DEPLOY_REMOTE="${DEPLOY_REMOTE:-origin}"
 DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 DEPLOY_WAIT_TIMEOUT="${DEPLOY_WAIT_TIMEOUT:-300}"
+IMAGE_PREFIX="${DEPLOY_IMAGE_PREFIX:-ghcr.io/mik-en/efd}"
+STATE_FILE="${DEPLOY_STATE_FILE:-.deployed-sha}"
+PREV_IMAGE_TAG=""
+if [ -f "$STATE_FILE" ]; then
+  PREV_IMAGE_TAG="$(cat "$STATE_FILE")"
+  [[ "$PREV_IMAGE_TAG" =~ ^[0123456789abcdef]{40}$ ]] || PREV_IMAGE_TAG=""
+fi
 
 tracked_status="$(git status --porcelain --untracked-files=no)" || die 2 "could not check repository status"
 [ -z "$tracked_status" ] || die 2 "tracked files have local modifications"
@@ -140,7 +159,8 @@ case "$backup_output" in
 esac
 
 deploy_step checkout git merge --ff-only --quiet "$SHA"
-deploy_step build dc build
+use_images "$SHA"
+deploy_step pull dc pull backend proxy
 deploy_step migrate dc run --rm migrate
 deploy_step import-content dc run --rm import-content
 deploy_step up dc up -d --wait --wait-timeout "$DEPLOY_WAIT_TIMEOUT"
@@ -151,4 +171,5 @@ if [ -n "${DEPLOY_HEALTH_URL:-}" ]; then
   deploy_step "health check" check_health
 fi
 
+printf '%s\n' "$SHA" > "$STATE_FILE"
 printf '%s deploy ok: %s\n' "$(iso_now)" "$SHA"
