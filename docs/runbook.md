@@ -379,7 +379,7 @@ docker compose --env-file .env.production -f deploy/compose.production.yaml -f d
 docker compose --env-file .env.production -f deploy/compose.production.yaml -f deploy/compose.vps.yaml up -d
 ```
 
-После обновления кода на сервере выполните `dc build`, затем `dc up -d --wait`. Если вы меняли смонтированный файл (`deploy/Caddyfile`), дополнительно перезапустите контейнер: `dc restart caddy`, иначе он продолжит читать старую версию файла.
+После обновления кода на сервере выполните `dc build`, затем `dc up -d --wait` (при ручном выпуске, если Docker Hub доступен; иначе см. «Образы из GHCR» ниже). Если вы меняли смонтированный файл (`deploy/Caddyfile`), дополнительно перезапустите контейнер: `dc restart caddy`, иначе он продолжит читать старую версию файла.
 
 Если стек уже был запущен без VPS-override, перед первым `up` с ним выполните `down`: override меняет подсеть сети `default` на `172.30.50.0/24`, и переключение работающего стека ломает сеть. Используйте именно `down`, а не `down -v`: `-v` удаляет том `postgres_data` с базой. На свежем сервере просто начните сразу с двух файлов.
 
@@ -392,9 +392,9 @@ docker compose --env-file .env.production -f deploy/compose.production.yaml -f d
 ### Автоматический выпуск
 
 После успешного CI для push в `main` workflow `Deploy` подключается к серверу по SSH и запускает `scripts/vps-deploy.sh` для коммита, который прошёл CI.
-Скрипт делает бэкап, обновляет код через fast-forward, выполняет `build`, `migrate`, `import-content` и `up --wait`.
+Сначала задание `build-images` собирает образы `backend` и `proxy` для этого коммита и публикует их в GHCR как `ghcr.io/mik-en/efd-backend:<sha>` и `ghcr.io/mik-en/efd-proxy:<sha>`. Сервер ничего не собирает. Скрипт делает бэкап, обновляет код через fast-forward, выполняет `pull`, `migrate`, `import-content` и `up --wait`.
 Если изменился `deploy/Caddyfile`, скрипт перезапускает Caddy. Затем он проверяет `DEPLOY_HEALTH_URL`, если адрес задан.
-При сбое после обновления скрипт возвращает код к предыдущему коммиту и пересобирает образы.
+При сбое после обновления скрипт возвращает код к предыдущему коммиту и поднимает образы предыдущего выпуска (их SHA записан в `.deployed-sha` в корне checkout; при первом выпуске используются локально собранные образы `:local`).
 Схема БД остаётся на версии, достигнутой к моменту сбоя. Для её отката восстановите БД из бэкапа по разделу [«Откат схемы и контента»](#откат-схемы-и-контента).
 Для ручного запуска откройте Actions → Deploy → Run workflow, выберите `main` и запустите выпуск текущего коммита ветки.
 
@@ -456,6 +456,20 @@ ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
 ```
 
 Если отпечатки совпадают, запишите содержимое `efd_known_hosts` в `DEPLOY_KNOWN_HOSTS`. После настройки удалите закрытый ключ с машины разработчика или храните его в защищённом месте.
+
+**Образы из GHCR**
+
+С российского VPS не скачиваются слои образов с Docker Hub (CDN отвечает таймаутом), поэтому `docker build` на сервере не работает. Образы собирает GitHub Actions, где Docker Hub доступен, а сервер скачивает их из `ghcr.io`.
+
+После первой публикации откройте GitHub → Packages → `efd-backend` и `efd-proxy` → Package settings и сделайте пакеты публичными (в образах нет секретов, исходный код открыт), иначе серверу понадобится `docker login ghcr.io` с токеном `read:packages`. Проверьте скачивание на сервере.
+
+```bash
+docker pull ghcr.io/mik-en/efd-backend:<sha>
+```
+
+Задайте каталог бэкапов в `.env.production`, тот же, что у cron, иначе скрипт попробует писать в `/var/backups` без прав: `BACKUP_DIR=/home/deploy/backups/english-for-developers`.
+
+Не выполняйте `git pull` на сервере вручную перед выпуском: если HEAD уже равен целевому коммиту, скрипт напишет `already at <sha>` и ничего не выкатит.
 
 **Коды завершения**
 
