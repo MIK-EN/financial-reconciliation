@@ -23,6 +23,7 @@ uv sync --locked
 echo "→ Миграции и контент"
 uv run --locked alembic upgrade head
 uv run --locked python -m english_for_developers.cli content import content/onboarding-v1.json --activate --threshold-percent 20
+uv run --locked python -m english_for_developers.cli trainer import content/trainer-v1.json --activate
 
 for port in "$BACKEND_PORT" 5173; do
   if lsof -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then

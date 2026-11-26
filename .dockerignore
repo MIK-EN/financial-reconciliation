@@ -1,6 +1,7 @@
 .git
 .github
 .venv
+.tools
 **/__pycache__
 *.pyc
 .pytest_cache

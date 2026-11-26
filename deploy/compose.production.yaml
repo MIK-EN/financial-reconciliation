@@ -109,15 +109,11 @@ services:
       target: backend
     image: english-for-developers-backend:local
     command:
-      - python
-      - -m
-      - english_for_developers.cli
-      - content
-      - import
-      - content/onboarding-v1.json
-      - --activate
-      - --threshold-percent
-      - "20"
+      - /bin/sh
+      - -ec
+      - |
+        python -m english_for_developers.cli content import content/onboarding-v1.json --activate --threshold-percent 20
+        python -m english_for_developers.cli trainer import content/trainer-v1.json --activate
     restart: "no"
     depends_on:
       postgres:
