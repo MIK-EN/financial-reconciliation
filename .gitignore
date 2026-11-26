@@ -32,3 +32,5 @@ frontend/test-results/
 # Local project collaboration instructions.
 /AGENTS.md
 /HUMAN.MD
+
+.tools/

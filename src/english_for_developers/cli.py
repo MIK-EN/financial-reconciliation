@@ -15,6 +15,8 @@ from english_for_developers.content.schema import ContentBundle
 from english_for_developers.content.validation import validate_bundle
 from english_for_developers.storage.cleanup import cleanup_expired_sessions
 from english_for_developers.storage.database import make_session_factory
+from english_for_developers.trainer.content import TrainerContent
+from english_for_developers.trainer.importer import import_trainer
 
 
 def _load_bundle(path: Path) -> ContentBundle:
@@ -35,6 +37,14 @@ def _parser() -> argparse.ArgumentParser:
     publish.add_argument("path", type=Path)
     publish.add_argument("--activate", action="store_true")
     publish.add_argument("--threshold-percent", type=int, default=20)
+
+    trainer = groups.add_parser("trainer", help="manage trainer content")
+    trainer_commands = trainer.add_subparsers(dest="command", required=True)
+    for command in ("validate", "import"):
+        trainer_command = trainer_commands.add_parser(command)
+        trainer_command.add_argument("path", type=Path)
+        if command == "import":
+            trainer_command.add_argument("--activate", action="store_true")
 
     sessions = groups.add_parser("sessions", help="manage browser sessions")
     session_commands = sessions.add_subparsers(dest="command", required=True)
@@ -58,6 +68,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.group == "sessions":
             return _cleanup_sessions()
+
+        if args.group == "trainer":
+            return _trainer_command(args)
 
         bundle = _load_bundle(args.path)
         if args.command == "validate":
@@ -85,6 +98,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     except SQLAlchemyError:
         print("error: database operation failed", file=sys.stderr)
         return 1
+
+
+def _trainer_command(args: argparse.Namespace) -> int:
+    content = TrainerContent.model_validate_json(args.path.read_text(encoding="utf-8"))
+    if args.command == "validate":
+        print(f"valid {content.version} sha256:{content.content_hash}")
+        return 0
+    database_url = os.environ.get("DATABASE_URL")
+    if not database_url:
+        raise ValueError("Set DATABASE_URL before importing content")
+    with make_session_factory(database_url).begin() as session:
+        result = import_trainer(session, content, activate=args.activate)
+    action = "stored" if result.inserted else "unchanged"
+    print(f"{action} {result.version}" + (" and activated" if result.activated else ""))
+    return 0
 
 
 if __name__ == "__main__":
