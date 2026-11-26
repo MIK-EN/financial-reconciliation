@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import "@fontsource-variable/manrope";
 
 import { App } from "./App";
+import { Trainer } from "./trainer/Trainer";
 import "./styles.css";
 
 const root = document.getElementById("root");
@@ -14,6 +15,6 @@ if (root === null) {
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    {window.location.pathname === "/trainer" ? <Trainer /> : <App />}
   </StrictMode>,
 );
